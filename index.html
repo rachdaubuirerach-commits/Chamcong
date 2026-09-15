@@ -8,8 +8,13 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="manifest" href="manifest.json">
-    <title>TimeTracker v3.2</title>
-    <link rel="stylesheet" href="style.css">
+    <title>TimeTracker v3.3</title>
+
+    <!-- Preconnect tới CDN để tải nhanh hơn -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+
+    <link rel="stylesheet" href="style.css?v=1">
 </head>
 <body>
 
@@ -72,7 +77,7 @@
         <h1 class="splash-title">Time<span>Tracker</span></h1>
         <p class="splash-sub" data-i18n="app_subtitle">Chấm công & Lương</p>
         <div class="splash-loader"><div class="splash-loader-bar"></div></div>
-        <p class="splash-version">v3.2</p>
+        <p class="splash-version">v3.3</p>
     </div>
 </div>
 
@@ -667,7 +672,7 @@
             </button>
         </div>
         <p id="settings-message" class="mt-10" style="color:var(--success);font-weight:500;"></p>
-        <p class="app-version-footer">TimeTracker v3.2</p>
+        <p class="app-version-footer">TimeTracker v3.3</p>
     </div>
 </div>
 
@@ -700,11 +705,11 @@
 
 <div id="confetti-layer"></div>
 
-<script src="lunar-engine.js"></script>
-<script src="holiday-data.js"></script>
-<script src="holiday-resolver.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="image-export.js"></script>
-<script src="script.js"></script>
+<script src="lunar-engine.js?v=1"></script>
+<script src="holiday-data.js?v=1"></script>
+<script src="holiday-resolver.js?v=1"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+<script src="image-export.js?v=1"></script>
+<script src="script.js?v=1"></script>
 </body>
 </html>
