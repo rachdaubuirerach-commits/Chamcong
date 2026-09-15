@@ -474,18 +474,10 @@
             <div id="chart-trend" class="chart-container"></div>
         </div>
 
-        <div style="display:flex;gap:8px;margin-bottom:14px;">
-            <button class="btn btn-success" onclick="exportCSV()" style="flex:1;">
-                <svg width="16" height="16"><use href="#i-download"/></svg>
-                CSV
-            </button>
-            <button class="btn btn-primary" onclick="exportExcel()" style="flex:1;">
-                <svg width="16" height="16"><use href="#i-upload"/></svg>
-                Excel
-            </button>
-            <button class="btn btn-danger" onclick="exportImage()" style="flex:1;" id="image-export-btn">
-                <svg width="16" height="16"><use href="#i-image"/></svg>
-                <span>PNG</span>
+        <div style="margin-bottom:14px;">
+            <button class="btn btn-danger w-full" onclick="exportImage()" id="image-export-btn" style="min-height:52px;font-size:15px;">
+                <svg width="18" height="18"><use href="#i-image"/></svg>
+                <span>📸 Xuất ảnh PNG</span>
             </button>
         </div>
     </div>

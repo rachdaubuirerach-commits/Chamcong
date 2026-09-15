@@ -1,5 +1,5 @@
 // ========================================================================
-// TIMETRACKER v3.2 — Tích hợp Âm lịch + Ngày lễ + Xuất ảnh PNG
+// TIMETRACKER v3.2 — Chỉ xuất PNG, không tính tiền trong ảnh
 // ========================================================================
 
 const APP_VERSION = "3.2.0";
@@ -1158,53 +1158,24 @@ function renderTrendChart() {
 }
 
 // ========================================================================
-//  EXPORT
+//  EXPORT PNG (bỏ tiền, chỉ Ngày/Ca/Vào/Ra/Tăng ca)
 // ========================================================================
 function getExportRows() {
     const m = parseInt(document.getElementById('stat-month-select').value);
     const y = parseInt(document.getElementById('stat-year-input').value);
     const logs = getLogsByMonth(m, y).sort((a,b) => new Date(a.date) - new Date(b.date));
     return logs.map(l => ({
-        date: l.date, shift: l.shift,
+        date: l.date,
+        shift: l.shift,
         type: l.isSunday ? 'Chủ nhật' : 'Thường',
-        start: l.start, end: l.end,
-        reg: l.regularHours.toFixed(2), ot: l.overtimeHours.toFixed(2),
-        pay: l.totalPay, note: getNote(l.date) || ''
+        start: l.start,
+        end: l.end,
+        reg: l.regularHours.toFixed(2),
+        ot: l.overtimeHours.toFixed(2),
+        note: getNote(l.date) || ''
     }));
 }
 
-function exportCSV() {
-    const rows = getExportRows();
-    if (rows.length === 0) { showToast('Không có dữ liệu để xuất.', 'warning'); return; }
-    const m = parseInt(document.getElementById('stat-month-select').value);
-    const y = parseInt(document.getElementById('stat-year-input').value);
-    const headers = ['Ngày','Ca','Loại','Vào','Ra','Giờ thường','Tăng ca','Tiền công','Ghi chú'];
-    const csv = [headers.join(',')];
-    rows.forEach(r => csv.push([r.date, r.shift, r.type, r.start, r.end, r.reg, r.ot, r.pay, `"${r.note.replace(/"/g,'""')}"`].join(',')));
-    downloadFile(csv.join('\n'), `chamcong_${String(m).padStart(2,'0')}_${y}.csv`, 'text/csv;charset=utf-8;');
-    showToast('✅ Đã xuất CSV!', 'success');
-}
-
-function exportExcel() {
-    const rows = getExportRows();
-    if (rows.length === 0) { showToast('Không có dữ liệu để xuất.', 'warning'); return; }
-    const m = parseInt(document.getElementById('stat-month-select').value);
-    const y = parseInt(document.getElementById('stat-year-input').value);
-    let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>';
-    html += '<table border="1"><tr><th>Ngày</th><th>Ca</th><th>Loại</th><th>Vào</th><th>Ra</th><th>Giờ thường</th><th>Tăng ca</th><th>Tiền công</th><th>Ghi chú</th></tr>';
-    rows.forEach(r => {
-        html += `<tr><td>${r.date}</td><td>${r.shift}</td><td>${r.type}</td><td>${r.start}</td><td>${r.end}</td><td>${r.reg}</td><td>${r.ot}</td><td>${r.pay}</td><td>${r.note}</td></tr>`;
-    });
-    const total = rows.reduce((s,r) => s + r.pay, 0);
-    html += `<tr><td colspan="7" style="font-weight:bold;text-align:right;">TỔNG:</td><td style="font-weight:bold;">${total.toLocaleString('vi-VN')} đ</td><td></td></tr>`;
-    html += '</table></body></html>';
-    downloadFile(html, `chamcong_${String(m).padStart(2,'0')}_${y}.xls`, 'application/vnd.ms-excel');
-    showToast('✅ Đã xuất Excel!', 'success');
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   XUẤT PNG — Dùng ImageExporter (tiếng Việt 100% có dấu)
-   ═══════════════════════════════════════════════════════════════ */
 async function exportImage() {
     const rows = getExportRows();
     if (rows.length === 0) {
@@ -1805,7 +1776,7 @@ window.onload = function () {
 };
 
 // ========================================================================
-//  HÀM TÍNH LƯƠNG — TÍCH HỢP NGÀY LỄ
+//  HÀM TÍNH LƯƠNG
 // ========================================================================
 function calculateWorkLog(workDate, shift, isSunday, startTimeStr, endTimeStr) {
     const dailyRate = settings.baseSalary / settings.standardWorkDays;
