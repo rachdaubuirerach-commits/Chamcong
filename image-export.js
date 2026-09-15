@@ -1,9 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════
-   image-export.js — Xuất PNG (không tính tiền, CN nổi bật)
+   image-export.js v3.3 — Xuất PNG (tối ưu memory + tốc độ)
    ═══════════════════════════════════════════════════════════════ */
 
 const ImageExporter = (function () {
     'use strict';
+
+    // Cache buildTableHTML để tránh build lại nhiều lần
+    let _lastBuildKey = '';
+    let _lastBuildHTML = '';
 
     function escapeHtml(str) {
         if (!str) return '';
@@ -16,36 +20,37 @@ const ImageExporter = (function () {
     }
 
     function buildTableHTML(rows, month, year, settings, appVersion) {
-        // Tổng giờ
+        // Cache key — nếu không đổi thì trả kết quả cũ
+        const cacheKey = `${month}-${year}-${rows.length}-${rows[0]?.date || ''}-${rows[rows.length-1]?.date || ''}`;
+        if (cacheKey === _lastBuildKey && _lastBuildHTML) {
+            return _lastBuildHTML;
+        }
+
         const totalRegH = rows.reduce((s, r) => s + parseFloat(r.reg), 0);
         const totalOtH = rows.reduce((s, r) => s + parseFloat(r.ot), 0);
-        const totalSunDays = rows.filter(r => r.type === 'Chủ nhật').length;
+        let totalSunDays = 0;
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i].type === 'Chủ nhật') totalSunDays++;
+        }
 
         const themeColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--primary').trim() || '#4F46E5';
         const themeLight = getComputedStyle(document.documentElement)
             .getPropertyValue('--primary-light').trim() || '#818CF8';
 
-        // ═══ ROWS HTML — Chủ nhật nổi bật ═══
-        const rowsHTML = rows.map(r => {
+        // Build rows HTML — dùng mảng join thay vì string += (nhanh hơn)
+        const rowsArr = [];
+        for (let i = 0; i < rows.length; i++) {
+            const r = rows[i];
             const isSunday = r.type === 'Chủ nhật';
-            const bg = isSunday
-                ? 'linear-gradient(90deg, #FEF3C7, #FDE68A)'
-                : '#FFFFFF';
             const rowStyle = isSunday
-                ? `background:${bg};font-weight:700;`
-                : '';
-            const dateStyle = isSunday
-                ? 'color:#B45309;font-weight:800;'
-                : 'color:#334155;';
-            const shiftStyle = isSunday
-                ? 'color:#B45309;font-weight:800;'
-                : 'color:#334155;';
-            const otStyle = isSunday
-                ? 'color:#DC2626;font-weight:800;'
-                : 'color:#334155;';
+                ? 'background:linear-gradient(90deg, #FEF3C7, #FDE68A);font-weight:700;'
+                : (i % 2 === 0 ? 'background:#FFFFFF;' : 'background:#F8FAFC;');
+            const dateStyle = isSunday ? 'color:#B45309;font-weight:800;' : 'color:#334155;';
+            const shiftStyle = isSunday ? 'color:#B45309;font-weight:800;' : 'color:#334155;';
+            const otStyle = isSunday ? 'color:#DC2626;font-weight:800;' : 'color:#334155;';
 
-            return `
+            rowsArr.push(`
                 <tr style="${rowStyle}">
                     <td style="padding:10px 8px;border:1px solid #E2E8F0;font-size:13px;text-align:center;${dateStyle}">${escapeHtml(r.date)}</td>
                     <td style="padding:10px 8px;border:1px solid #E2E8F0;font-size:13px;text-align:center;${shiftStyle}">${escapeHtml(r.shift)}</td>
@@ -54,12 +59,12 @@ const ImageExporter = (function () {
                     <td style="padding:10px 8px;border:1px solid #E2E8F0;font-size:13px;text-align:center;${otStyle}">${escapeHtml(r.ot)}</td>
                     <td style="padding:10px 8px;border:1px solid #E2E8F0;font-size:13px;text-align:left;color:#334155;">${escapeHtml(r.note || '')}</td>
                 </tr>
-            `;
-        }).join('');
+            `);
+        }
+        const rowsHTML = rowsArr.join('');
 
-        return `
+        const html = `
             <div style="width:1200px;background:#FFFFFF;font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,'Roboto','Helvetica Neue',Arial,sans-serif;padding:0;box-sizing:border-box;">
-                <!-- HEADER -->
                 <div style="background:linear-gradient(135deg,${themeColor} 0%,${themeLight} 100%);padding:28px 40px;color:white;text-align:center;">
                     <div style="font-size:32px;font-weight:800;letter-spacing:1.5px;margin-bottom:8px;text-shadow:0 2px 4px rgba(0,0,0,0.1);">
                         BẢNG CHẤM CÔNG
@@ -70,7 +75,6 @@ const ImageExporter = (function () {
                     </div>
                 </div>
 
-                <!-- TABLE -->
                 <div style="padding:24px 40px;">
                     <table style="width:100%;border-collapse:collapse;font-family:inherit;">
                         <thead>
@@ -88,7 +92,6 @@ const ImageExporter = (function () {
                         </tbody>
                     </table>
 
-                    <!-- CHÚ THÍCH CHỦ NHẬT -->
                     ${totalSunDays > 0 ? `
                         <div style="margin-top:14px;font-size:13px;color:#92400E;background:#FEF3C7;padding:10px 16px;border-radius:10px;border-left:4px solid #F59E0B;">
                             🟡 <strong>${totalSunDays} ngày Chủ nhật</strong> — nền vàng, chữ đậm
@@ -96,7 +99,6 @@ const ImageExporter = (function () {
                     ` : ''}
                 </div>
 
-                <!-- SUMMARY -->
                 <div style="margin:0 40px 24px;background:#F5F7FC;border-radius:14px;padding:22px 28px;">
                     <div style="font-size:17px;font-weight:800;color:${themeColor};margin-bottom:14px;letter-spacing:0.5px;">
                         TỔNG KẾT
@@ -108,12 +110,16 @@ const ImageExporter = (function () {
                     </div>
                 </div>
 
-                <!-- FOOTER -->
                 <div style="padding:14px 40px 22px;text-align:center;color:#94A3B8;font-size:12px;border-top:1px solid #E2E8F0;">
                     TimeTracker v${appVersion}  ·  Xuất ngày: ${new Date().toLocaleDateString('vi-VN')}
                 </div>
             </div>
         `;
+
+        // Cache lại
+        _lastBuildKey = cacheKey;
+        _lastBuildHTML = html;
+        return html;
     }
 
     async function exportImage(options) {
@@ -132,14 +138,19 @@ const ImageExporter = (function () {
         document.body.appendChild(container);
 
         try {
-            await new Promise(r => setTimeout(r, 150));
+            // Đợi 1 frame để browser render
+            await new Promise(r => requestAnimationFrame(() => setTimeout(r, 80)));
+
+            // Tối ưu scale theo số dòng
+            const scale = rows.length > 30 ? 1.8 : 2;
 
             const canvas = await html2canvas(container.firstElementChild, {
-                scale: 2,
+                scale,
                 backgroundColor: '#FFFFFF',
                 logging: false,
                 useCORS: true,
-                windowWidth: 1200
+                windowWidth: 1200,
+                removeContainer: true
             });
 
             const blob = await new Promise(resolve => {
@@ -147,6 +158,10 @@ const ImageExporter = (function () {
             });
 
             if (!blob) throw new Error('Không tạo được ảnh PNG');
+
+            // Giải phóng canvas memory ngay
+            canvas.width = 0;
+            canvas.height = 0;
 
             const filename = `chamcong_${String(month).padStart(2, '0')}_${year}.png`;
             const url = URL.createObjectURL(blob);
@@ -160,11 +175,20 @@ const ImageExporter = (function () {
 
             return filename;
         } finally {
-            document.body.removeChild(container);
+            // Luôn cleanup
+            if (container.parentElement) {
+                document.body.removeChild(container);
+            }
         }
     }
 
-    return { exportImage };
+    return {
+        exportImage,
+        clearCache() {
+            _lastBuildKey = '';
+            _lastBuildHTML = '';
+        }
+    };
 })();
 
 if (typeof window !== 'undefined') window.ImageExporter = ImageExporter;
