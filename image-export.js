@@ -5,7 +5,6 @@
 const ImageExporter = (function () {
     'use strict';
 
-    // Cache buildTableHTML để tránh build lại nhiều lần
     let _lastBuildKey = '';
     let _lastBuildHTML = '';
 
@@ -20,16 +19,15 @@ const ImageExporter = (function () {
     }
 
     function buildTableHTML(rows, month, year, settings, appVersion) {
-        // Cache key — nếu không đổi thì trả kết quả cũ
-        const cacheKey = `${month}-${year}-${rows.length}-${rows[0]?.date || ''}-${rows[rows.length-1]?.date || ''}`;
+        const cacheKey = `${month}-${year}-${rows.length}-${rows[0] ? rows[0].date : ''}-${rows[rows.length-1] ? rows[rows.length-1].date : ''}`;
         if (cacheKey === _lastBuildKey && _lastBuildHTML) {
             return _lastBuildHTML;
         }
 
-        const totalRegH = rows.reduce((s, r) => s + parseFloat(r.reg), 0);
-        const totalOtH = rows.reduce((s, r) => s + parseFloat(r.ot), 0);
-        let totalSunDays = 0;
+        let totalRegH = 0, totalOtH = 0, totalSunDays = 0;
         for (let i = 0; i < rows.length; i++) {
+            totalRegH += parseFloat(rows[i].reg);
+            totalOtH += parseFloat(rows[i].ot);
             if (rows[i].type === 'Chủ nhật') totalSunDays++;
         }
 
@@ -38,7 +36,6 @@ const ImageExporter = (function () {
         const themeLight = getComputedStyle(document.documentElement)
             .getPropertyValue('--primary-light').trim() || '#818CF8';
 
-        // Build rows HTML — dùng mảng join thay vì string += (nhanh hơn)
         const rowsArr = [];
         for (let i = 0; i < rows.length; i++) {
             const r = rows[i];
@@ -116,7 +113,6 @@ const ImageExporter = (function () {
             </div>
         `;
 
-        // Cache lại
         _lastBuildKey = cacheKey;
         _lastBuildHTML = html;
         return html;
@@ -138,10 +134,8 @@ const ImageExporter = (function () {
         document.body.appendChild(container);
 
         try {
-            // Đợi 1 frame để browser render
             await new Promise(r => requestAnimationFrame(() => setTimeout(r, 80)));
 
-            // Tối ưu scale theo số dòng
             const scale = rows.length > 30 ? 1.8 : 2;
 
             const canvas = await html2canvas(container.firstElementChild, {
@@ -159,7 +153,6 @@ const ImageExporter = (function () {
 
             if (!blob) throw new Error('Không tạo được ảnh PNG');
 
-            // Giải phóng canvas memory ngay
             canvas.width = 0;
             canvas.height = 0;
 
@@ -175,7 +168,6 @@ const ImageExporter = (function () {
 
             return filename;
         } finally {
-            // Luôn cleanup
             if (container.parentElement) {
                 document.body.removeChild(container);
             }
