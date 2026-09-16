@@ -1,47 +1,25 @@
 // ========================================================================
-// TIMETRACKER v3.3 — Tối ưu hóa hiệu năng (giữ nguyên API)
+// TIMETRACKER v3.3 — Tối ưu + Hiệu ứng
 // ========================================================================
 
 const APP_VERSION = "3.3.0";
 
 const DEFAULT_SETTINGS = {
-    baseSalary: 5900000,
-    standardWorkDays: 26,
-    standardShiftHours: 8,
-    breakHours: 1,
-    otNormalDay: 1.5,
-    otNormalNight: 1.7,
-    otSundayDay: 2.0,
-    otSundayNight: 2.7,
-    otHoliday: 3.0,
-    morningStart: "07:30",
-    morningEnd: "19:30",
-    nightStart: "19:30",
-    nightEnd: "07:30",
-    monthlyGoal: 8000000,
-    themeColor: "indigo",
-    themeMode: "auto",
-    haptic: true,
-    sound: true,
-    reminders: true,
-    pinEnabled: false,
-    pinValue: "",
-    language: "vi"
+    baseSalary: 5900000, standardWorkDays: 26, standardShiftHours: 8, breakHours: 1,
+    otNormalDay: 1.5, otNormalNight: 1.7, otSundayDay: 2.0, otSundayNight: 2.7, otHoliday: 3.0,
+    morningStart: "07:30", morningEnd: "19:30", nightStart: "19:30", nightEnd: "07:30",
+    monthlyGoal: 8000000, themeColor: "indigo", themeMode: "auto",
+    haptic: true, sound: true, reminders: true,
+    pinEnabled: false, pinValue: "", language: "vi"
 };
 
-// ═══ CACHE MANAGER — Giảm 90% đọc/ghi localStorage ═══
+// ═══ CACHE MANAGER ═══
 const Cache = (function () {
     const stores = { settings: null, workLogs: null, absentDays: null, notes: null };
     return {
-        get(key, loader) {
-            if (stores[key] === null) stores[key] = loader();
-            return stores[key];
-        },
+        get(key, loader) { if (stores[key] === null) stores[key] = loader(); return stores[key]; },
         set(key, value) { stores[key] = value; },
-        invalidate(key) {
-            if (key) stores[key] = null;
-            else Object.keys(stores).forEach(k => stores[k] = null);
-        }
+        invalidate(key) { if (key) stores[key] = null; else Object.keys(stores).forEach(k => stores[k] = null); }
     };
 })();
 
@@ -156,7 +134,6 @@ let calLunarYear = null;
 let restoreData = null;
 let pinBuffer = "";
 
-// ═══ CACHE render ═══
 const _calRenderCache = new Map();
 const _statsRenderCache = new Map();
 
@@ -185,7 +162,7 @@ function saveWorkLogsToStorage() {
     _statsRenderCache.clear();
 }
 
-// ═══ ABSENT DAYS ═══
+// ═══ ABSENT ═══
 function getAbsentDays() {
     return Cache.get('absentDays', () => {
         const s = localStorage.getItem(storageKey('absent_days'));
@@ -222,14 +199,12 @@ function setNote(d, text) {
     else delete n[d];
     saveNotes(n);
 }
-
 function initState() {
     settings = loadSettings();
     workLogs = loadWorkLogs();
     getAbsentDays();
     getNotes();
 }
-
 function invalidateAllCache() {
     Cache.invalidate();
     _calRenderCache.clear();
@@ -320,7 +295,7 @@ function updateMonthLabels() {
     });
 }
 
-// ═══ i18n ═══
+// ═══ I18N APPLY ═══
 let _i18nNodes = null;
 function applyLanguage() {
     const t = I18N[settings.language] || I18N.vi;
@@ -341,7 +316,7 @@ const THEME_COLORS = Object.freeze({
     amber:   { primary:'#F59E0B', light:'#FBBF24', dark:'#B45309', grad:'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)', glow:'rgba(245,158,11,0.35)' }
 });
 
-function applyTheme() {
+function _applyThemeRaw() {
     const c = THEME_COLORS[settings.themeColor] || THEME_COLORS.indigo;
     const root = document.documentElement;
     root.style.setProperty('--primary', c.primary);
@@ -361,6 +336,14 @@ function applyTheme() {
     if (statsPage && !statsPage.classList.contains('hidden')) {
         _statsRenderCache.clear();
         loadStatistics();
+    }
+}
+
+function applyTheme() {
+    if (window.Effects && window.Effects.smoothThemeChange) {
+        window.Effects.smoothThemeChange(_applyThemeRaw);
+    } else {
+        _applyThemeRaw();
     }
 }
 
@@ -391,6 +374,8 @@ function switchPage(p) {
     if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
         document.startViewTransition(doSwitch);
     } else doSwitch();
+    // Re-attach ripple cho elements mới
+    if (window.Effects) setTimeout(() => window.Effects.attachRippleAll(), 100);
 }
 
 function goToCurrentMonth(page) {
@@ -442,7 +427,7 @@ function getSuggestedShift() {
     return { shift, startTime, endTime };
 }
 
-// ═══ QUICK CHECK-IN ═══
+// ═══ QUICK CHECK-IN (có effects) ═══
 function quickCheckIn() {
     const ts = todayStr();
     if (getLogByDate(ts)) { showToast('Bạn đã chấm công hôm nay!', 'warning'); return; }
@@ -460,8 +445,20 @@ function quickCheckIn() {
     });
     saveWorkLogsToStorage();
     haptic(); playSound();
+
+    // ⭐ HIỆU ỨNG: confetti + checkmark
+    if (window.Effects) {
+        const btn = document.querySelector('.hero-actions .btn-confirm');
+        if (btn) {
+            const rect = btn.getBoundingClientRect();
+            window.Effects.miniConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        }
+        window.Effects.showCheckmark && window.Effects.showCheckmark();
+    }
+
     if (r.isPaidHoliday) showToast('🎉 Chấm công ngày lễ ' + r.holiday.name, 'success');
     else showToast('✅ Chấm công thành công!', 'success');
+
     loadDashboard();
     if (!document.getElementById('page-worklog').classList.contains('hidden')) applyWorklogMonthFilter();
     if (!document.getElementById('page-calendar').classList.contains('hidden')) renderCalendar();
@@ -501,6 +498,7 @@ function editQuickCheckin() {
     }
 }
 
+// ═══ QUICK CHECK-IN UI ═══
 function renderQuickCheckin() {
     const content = document.getElementById('quick-checkin-content');
     const ts = todayStr();
@@ -597,10 +595,21 @@ function loadDashboard() {
         currentSalary += logs[i].totalPay;
     }
 
-    document.getElementById('dash-total-days').innerText = totalDays;
-    document.getElementById('dash-total-hours').innerText = totalHours.toFixed(2);
-    document.getElementById('dash-total-ot').innerText = totalOT.toFixed(2);
-    document.getElementById('dash-current-salary').innerText = currentSalary.toLocaleString('vi-VN') + ' đ';
+    const el1 = document.getElementById('dash-total-days');
+    const el2 = document.getElementById('dash-total-hours');
+    const el3 = document.getElementById('dash-total-ot');
+    const el4 = document.getElementById('dash-current-salary');
+
+    el1.innerText = totalDays;
+    el2.innerText = totalHours.toFixed(2);
+    el3.innerText = totalOT.toFixed(2);
+    el4.innerText = currentSalary.toLocaleString('vi-VN') + ' đ';
+
+    // Hiệu ứng pulse khi update
+    if (window.Effects) {
+        window.Effects.pulse(el1);
+        window.Effects.pulse(el4);
+    }
 
     const now = new Date();
     const isCur = dashMonth === now.getMonth() + 1 && dashYear === now.getFullYear();
@@ -689,7 +698,6 @@ function launchConfetti() {
 function renderAchievements() {
     const card = document.getElementById('achievements-card');
     const list = document.getElementById('achievements-list');
-
     let streak = 0;
     const today = new Date(); today.setHours(0,0,0,0);
     let check = new Date(today);
@@ -708,7 +716,6 @@ function renderAchievements() {
     });
     let bestKey = '', bestVal = 0;
     Object.entries(monthMap).forEach(([k,v]) => { if (v > bestVal) { bestVal = v; bestKey = k; } });
-
     const items = [];
     if (streak >= 3) items.push({ icon:'🔥', name:`Chuỗi ${streak} ngày`, val:`Streak hiện tại`, color:'#F59E0B' });
     if (totalAll >= 10) items.push({ icon:'📚', name:`${totalAll} ngày tổng`, val:'Tổng chấm công', color:'#6366F1' });
@@ -970,6 +977,7 @@ function showCalDetail(ds) {
     }
     detail.style.display = 'block';
     detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (window.Effects) setTimeout(() => window.Effects.attachRippleAll(), 50);
 }
 function showLunarDetail(lunarDay, lunarMonth, lunarYear) {
     const solar = LunarEngine.toSolar(lunarDay, lunarMonth, lunarYear, false);
@@ -998,7 +1006,6 @@ function loadStatistics() {
     const y = parseInt(document.getElementById('stat-year-input').value);
     const logs = getLogsByMonth(m, y);
     const c = document.getElementById('statistics-content');
-
     if (logs.length === 0) {
         c.innerHTML = '<p class="text-muted">Không có dữ liệu.</p>';
         renderDailyChart([], m, y); renderShiftChart(0,0); renderTrendChart();
@@ -1274,7 +1281,7 @@ function loadWorkLogTable() {
     });
 }
 
-// ═══ DELETE OLD DATA ═══
+// ═══ DELETE OLD ═══
 function updateDeletePreview() {
     const m = parseInt(document.getElementById('delete-month').value);
     const y = parseInt(document.getElementById('delete-year').value);
@@ -1369,7 +1376,7 @@ function highlightThemeSwatch() {
     });
 }
 
-// ═══ MULTI-PROFILE ═══
+// ═══ PROFILES ═══
 function renderProfileList() {
     const list = document.getElementById('profile-list');
     const profiles = getProfiles();
@@ -1528,6 +1535,7 @@ function handlePinInput(num) {
         } else {
             document.getElementById('pin-error').textContent = '❌ Sai PIN!';
             document.querySelector('.pin-box').classList.add('shake');
+            if (window.Effects) window.Effects.shake(document.querySelector('.pin-box'));
             setTimeout(() => {
                 document.querySelector('.pin-box').classList.remove('shake');
                 pinBuffer = '';
@@ -1541,26 +1549,6 @@ function handlePinInput(num) {
 function hideSplash() {
     const s = document.getElementById('splash-screen');
     setTimeout(() => { s.classList.add('hide'); setTimeout(() => s.remove(), 600); }, 1600);
-}
-
-// ═══ RIPPLE ═══
-function attachRipple() {
-    document.querySelectorAll('.btn, .nav-item, .icon-btn, .fab, .pin-pad button').forEach(el => {
-        if (el.dataset.ripple) return;
-        el.dataset.ripple = '1';
-        el.addEventListener('pointerdown', e => {
-            if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-            const r = document.createElement('span');
-            r.className = 'ripple';
-            const rect = el.getBoundingClientRect();
-            r.style.left = (e.clientX - rect.left) + 'px';
-            r.style.top = (e.clientY - rect.top) + 'px';
-            if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
-            el.style.overflow = 'hidden';
-            el.appendChild(r);
-            setTimeout(() => r.remove(), 600);
-        });
-    });
 }
 
 // ═══ TOP BAR SCROLL ═══
@@ -1663,7 +1651,11 @@ window.onload = function () {
     applyWorklogMonthFilter();
 
     setupTopBarScroll();
-    setTimeout(attachRipple, 100);
+
+    // ⭐ Khởi tạo hiệu ứng
+    setTimeout(() => {
+        if (window.Effects) window.Effects.autoAttach();
+    }, 100);
 
     document.querySelectorAll('.bottom-nav .nav-item').forEach(item => {
         item.addEventListener('keydown', e => {
@@ -1677,7 +1669,7 @@ window.onload = function () {
     setInterval(checkReminder, 30 * 60 * 1000);
 };
 
-// ═══ CALCULATE WORK LOG ═══
+// ═══ CALCULATE ═══
 function calculateWorkLog(workDate, shift, isSunday, startTimeStr, endTimeStr) {
     const dailyRate = settings.baseSalary / settings.standardWorkDays;
     const hourlyRate = dailyRate / settings.standardShiftHours;
