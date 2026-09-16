@@ -8,17 +8,190 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="manifest" href="manifest.json">
-    <title>TimeTracker v3.3</title>
+    <title>TimeTracker v4.0</title>
 
-    <!-- Preconnect CDN để tải nhanh hơn -->
+    <!-- Preconnect CDN -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://www.gstatic.com">
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://firestore.googleapis.com">
 
-    <link rel="stylesheet" href="style.css?v=2">
-    <link rel="stylesheet" href="style-effects.css?v=2">
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style-effects.css?v=3">
+    <link rel="stylesheet" href="style-auth.css?v=1">
 </head>
 <body>
 
+<!-- ═══════════════════════════════════════════════════════════
+     MÀN HÌNH AUTH (Đăng nhập / Đăng ký) — Hiện đầu tiên
+     ═══════════════════════════════════════════════════════════ -->
+<div id="auth-screen" class="auth-screen">
+    <div class="auth-container">
+
+        <!-- Logo -->
+        <div class="auth-logo">
+            <div class="auth-logo-icon">
+                <svg width="48" height="48" viewBox="0 0 72 72" fill="none">
+                    <defs>
+                        <linearGradient id="authGrad" x1="0" y1="0" x2="72" y2="72" gradientUnits="userSpaceOnUse">
+                            <stop offset="0%" stop-color="#6366F1"/>
+                            <stop offset="100%" stop-color="#8B5CF6"/>
+                        </linearGradient>
+                    </defs>
+                    <rect width="72" height="72" rx="20" fill="url(#authGrad)"/>
+                    <circle cx="36" cy="34" r="22" stroke="white" stroke-width="4"/>
+                    <path d="M29 34L35 40L47 28" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <h1 class="auth-title">Time<span>Tracker</span></h1>
+            <p class="auth-subtitle">Chấm công thông minh</p>
+        </div>
+
+        <!-- Tabs: Đăng nhập / Đăng ký -->
+        <div class="auth-tabs">
+            <button class="auth-tab active" data-auth-tab="login" onclick="AuthUI.switchTab('login')">
+                🔑 Đăng nhập
+            </button>
+            <button class="auth-tab" data-auth-tab="register" onclick="AuthUI.switchTab('register')">
+                ✨ Đăng ký
+            </button>
+        </div>
+
+        <!-- ═══ FORM ĐĂNG NHẬP ═══ -->
+        <form id="login-form" class="auth-form active" onsubmit="AuthUI.handleLogin(event)">
+            <div class="auth-form-group">
+                <label for="login-username">Tên đăng nhập</label>
+                <input type="text" id="login-username" class="auth-input"
+                       placeholder="VD: nguyenvana"
+                       autocomplete="username" autocapitalize="none" autocorrect="off">
+            </div>
+
+            <div class="auth-form-group">
+                <label for="login-password">Mật khẩu</label>
+                <div class="auth-password-wrapper">
+                    <input type="password" id="login-password" class="auth-input"
+                           placeholder="Nhập mật khẩu"
+                           autocomplete="current-password">
+                    <button type="button" class="auth-toggle-password" onclick="AuthUI.togglePassword('login-password', this)" aria-label="Hiện/Ẩn mật khẩu">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" class="auth-btn auth-btn-primary" id="login-submit-btn">
+                <span class="auth-btn-text">Đăng nhập</span>
+                <span class="auth-btn-spinner hidden"></span>
+            </button>
+
+            <button type="button" class="auth-link" onclick="AuthUI.showForgotPassword()">
+                Quên mật khẩu?
+            </button>
+        </form>
+
+        <!-- ═══ FORM ĐĂNG KÝ ═══ -->
+        <form id="register-form" class="auth-form" onsubmit="AuthUI.handleRegister(event)">
+            <div class="auth-form-group">
+                <label for="register-username">Tên đăng nhập <span class="required">*</span></label>
+                <input type="text" id="register-username" class="auth-input"
+                       placeholder="3-20 ký tự, chữ/số/gạch dưới"
+                       autocomplete="username" autocapitalize="none" autocorrect="off">
+                <span class="auth-hint">Ví dụ: nguyenvana, nva_2024</span>
+            </div>
+
+            <div class="auth-form-group">
+                <label for="register-password">Mật khẩu <span class="required">*</span></label>
+                <div class="auth-password-wrapper">
+                    <input type="password" id="register-password" class="auth-input"
+                           placeholder="Ít nhất 6 ký tự"
+                           autocomplete="new-password">
+                    <button type="button" class="auth-toggle-password" onclick="AuthUI.togglePassword('register-password', this)" aria-label="Hiện/Ẩn mật khẩu">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+                <div class="auth-password-strength">
+                    <div class="strength-bar"><div class="strength-fill" id="strength-fill"></div></div>
+                    <span class="strength-text" id="strength-text">Nhập mật khẩu</span>
+                </div>
+            </div>
+
+            <div class="auth-form-group">
+                <label for="register-password-confirm">Nhập lại mật khẩu <span class="required">*</span></label>
+                <input type="password" id="register-password-confirm" class="auth-input"
+                       placeholder="Nhập lại mật khẩu"
+                       autocomplete="new-password">
+            </div>
+
+            <!-- Email khôi phục (tùy chọn) -->
+            <div class="auth-form-group auth-optional">
+                <label for="register-email">
+                    📧 Email khôi phục <span class="auth-badge-optional">Tùy chọn</span>
+                </label>
+                <input type="email" id="register-email" class="auth-input"
+                       placeholder="VD: email@gmail.com"
+                       autocomplete="email" autocapitalize="none">
+                <span class="auth-hint">
+                    💡 Nhập email để có thể tự khôi phục mật khẩu nếu quên.
+                    Bỏ trống nếu không muốn.
+                </span>
+            </div>
+
+            <div class="auth-warning">
+                <strong>⚠️ Lưu ý:</strong> Nếu bạn <strong>không nhập email</strong>,
+                khi quên mật khẩu sẽ <strong>không thể khôi phục</strong>.
+            </div>
+
+            <button type="submit" class="auth-btn auth-btn-primary" id="register-submit-btn">
+                <span class="auth-btn-text">Tạo tài khoản</span>
+                <span class="auth-btn-spinner hidden"></span>
+            </button>
+        </form>
+
+        <!-- ═══ QUÊN MẬT KHẨU ═══ -->
+        <form id="forgot-form" class="auth-form" onsubmit="AuthUI.handleForgotPassword(event)">
+            <h3 class="auth-form-title">Quên mật khẩu</h3>
+            <p class="auth-form-desc">
+                Nhập email khôi phục của bạn. Chúng tôi sẽ gửi link đặt lại mật khẩu.
+            </p>
+
+            <div class="auth-form-group">
+                <label for="forgot-email">Email khôi phục</label>
+                <input type="email" id="forgot-email" class="auth-input"
+                       placeholder="email@gmail.com"
+                       autocomplete="email" autocapitalize="none">
+            </div>
+
+            <button type="submit" class="auth-btn auth-btn-primary" id="forgot-submit-btn">
+                <span class="auth-btn-text">Gửi email khôi phục</span>
+                <span class="auth-btn-spinner hidden"></span>
+            </button>
+
+            <button type="button" class="auth-link" onclick="AuthUI.switchTab('login')">
+                ← Quay lại đăng nhập
+            </button>
+        </form>
+
+        <!-- ═══ LOADING OVERLAY ═══ -->
+        <div id="auth-loading" class="auth-loading hidden">
+            <div class="auth-loading-spinner"></div>
+            <p class="auth-loading-text">Đang xử lý...</p>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="auth-footer">
+        <p>TimeTracker v4.0 · Dữ liệu được mã hóa an toàn 🔒</p>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     APP CHÍNH (ẩn, hiện sau khi đăng nhập)
+     ═══════════════════════════════════════════════════════════ -->
+<div id="app-content" class="app-content hidden">
+
+<!-- SVG Sprite -->
 <svg style="display:none" xmlns="http://www.w3.org/2000/svg">
     <symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
     <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>
@@ -46,68 +219,22 @@
     <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></symbol>
     <symbol id="i-pie" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></symbol>
     <symbol id="i-file-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></symbol>
-    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
     <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
-    <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
     <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
     <symbol id="i-zap" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
     <symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></symbol>
     <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></symbol>
     <symbol id="i-map-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
     <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></symbol>
+    <symbol id="i-log-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></symbol>
 </svg>
 
-<div id="splash-screen">
-    <div class="splash-content">
-        <div class="splash-logo">
-            <div class="splash-ring"></div>
-            <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
-                <defs>
-                    <linearGradient id="sg" x1="0" y1="0" x2="72" y2="72" gradientUnits="userSpaceOnUse">
-                        <stop offset="0%" stop-color="#6366F1"/>
-                        <stop offset="100%" stop-color="#8B5CF6"/>
-                    </linearGradient>
-                </defs>
-                <rect width="72" height="72" rx="20" fill="url(#sg)"/>
-                <circle cx="36" cy="34" r="22" stroke="white" stroke-width="4"/>
-                <path d="M29 34L35 40L47 28" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="36" cy="34" r="2" fill="white"/>
-            </svg>
-        </div>
-        <h1 class="splash-title">Time<span>Tracker</span></h1>
-        <p class="splash-sub" data-i18n="app_subtitle">Chấm công & Lương</p>
-        <div class="splash-loader"><div class="splash-loader-bar"></div></div>
-        <p class="splash-version">v3.3</p>
-    </div>
-</div>
-
-<div id="pin-lock" class="pin-lock hidden">
-    <div class="pin-box">
-        <div class="pin-icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        </div>
-        <h2 data-i18n="pin_title">Nhập mã PIN</h2>
-        <p class="pin-hint" data-i18n="pin_hint">Nhập 4 số để mở khóa</p>
-        <div class="pin-dots" id="pin-dots">
-            <span></span><span></span><span></span><span></span>
-        </div>
-        <div class="pin-pad" id="pin-pad">
-            <button data-num="1">1</button><button data-num="2">2</button><button data-num="3">3</button>
-            <button data-num="4">4</button><button data-num="5">5</button><button data-num="6">6</button>
-            <button data-num="7">7</button><button data-num="8">8</button><button data-num="9">9</button>
-            <button data-num="clear" class="pin-fn" aria-label="Clear">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-            <button data-num="0">0</button>
-            <button data-num="back" class="pin-fn" aria-label="Backspace">⌫</button>
-        </div>
-        <p class="pin-error" id="pin-error"></p>
-    </div>
-</div>
-
+<!-- TOAST -->
 <div id="toast-container"></div>
 
+<!-- TOP BAR -->
 <div class="top-bar" id="topBar">
     <div class="top-bar-left">
         <div class="brand-icon">
@@ -123,6 +250,9 @@
         </div>
     </div>
     <div class="top-bar-right">
+        <button class="icon-btn" id="sync-btn" aria-label="Sync" title="Đồng bộ">
+            <svg width="18" height="18"><use href="#i-cloud"/></svg>
+        </button>
         <button class="icon-btn" id="theme-toggle" aria-label="Theme">
             <svg width="18" height="18"><use href="#i-moon"/></svg>
         </button>
@@ -133,6 +263,7 @@
 </div>
 
 <div class="main-content">
+    <!-- DASHBOARD -->
     <div id="page-dashboard" class="page-content">
         <div class="card hero-card" id="quick-checkin-card">
             <div class="hero-card-bg"></div>
@@ -254,6 +385,7 @@
         </div>
     </div>
 
+    <!-- CALENDAR -->
     <div id="page-calendar" class="page-content hidden">
         <div class="card">
             <div class="card-header">
@@ -287,47 +419,20 @@
                 <div class="legend-group">
                     <span class="legend-group-title">Trạng thái ngày</span>
                     <div class="legend-items">
-                        <div class="legend-item">
-                            <span class="legend-swatch done"></span>
-                            <span>Đã đi làm</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-swatch absent"></span>
-                            <span>Đã nghỉ <small>(không đi làm)</small></span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-swatch sunday"></span>
-                            <span>Chủ nhật</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-swatch today"></span>
-                            <span>Hôm nay</span>
-                        </div>
+                        <div class="legend-item"><span class="legend-swatch done"></span><span>Đã đi làm</span></div>
+                        <div class="legend-item"><span class="legend-swatch absent"></span><span>Đã nghỉ <small>(không đi làm)</small></span></div>
+                        <div class="legend-item"><span class="legend-swatch sunday"></span><span>Chủ nhật</span></div>
+                        <div class="legend-item"><span class="legend-swatch today"></span><span>Hôm nay</span></div>
                     </div>
                 </div>
                 <div class="legend-group">
                     <span class="legend-group-title">Ngày lễ</span>
                     <div class="legend-items">
-                        <div class="legend-item">
-                            <span class="legend-swatch paid"></span>
-                            <span>Lễ có lương <small>(đi làm x3)</small></span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-swatch social"></span>
-                            <span>Kỷ niệm</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-swatch trad"></span>
-                            <span>Truyền thống</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-swatch religion"></span>
-                            <span>Tôn giáo</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-swatch recurring"></span>
-                            <span>Mùng 1, Rằm</span>
-                        </div>
+                        <div class="legend-item"><span class="legend-swatch paid"></span><span>Lễ có lương <small>(đi làm x3)</small></span></div>
+                        <div class="legend-item"><span class="legend-swatch social"></span><span>Kỷ niệm</span></div>
+                        <div class="legend-item"><span class="legend-swatch trad"></span><span>Truyền thống</span></div>
+                        <div class="legend-item"><span class="legend-swatch religion"></span><span>Tôn giáo</span></div>
+                        <div class="legend-item"><span class="legend-swatch recurring"></span><span>Mùng 1, Rằm</span></div>
                     </div>
                 </div>
             </div>
@@ -345,6 +450,7 @@
         </div>
     </div>
 
+    <!-- WORKLOG -->
     <div id="page-worklog" class="page-content hidden">
         <div class="card">
             <div class="card-header">
@@ -436,6 +542,7 @@
         </div>
     </div>
 
+    <!-- STATISTICS -->
     <div id="page-statistics" class="page-content hidden">
         <div class="card">
             <div class="card-header">
@@ -488,7 +595,28 @@
         </div>
     </div>
 
+    <!-- SETTINGS -->
     <div id="page-settings" class="page-content hidden">
+        <!-- User info -->
+        <div class="card user-card">
+            <div class="card-header">
+                <span class="icon"><svg width="16" height="16"><use href="#i-users"/></svg></span>
+                <span>Tài khoản</span>
+            </div>
+            <div class="user-info-display">
+                <div class="user-avatar" id="settings-avatar">U</div>
+                <div class="user-details">
+                    <div class="user-name" id="settings-username">username</div>
+                    <div class="user-email" id="settings-email">Chưa có email</div>
+                </div>
+            </div>
+            <button class="btn btn-warning w-full" onclick="AuthUI.logout()" style="margin-top:12px;">
+                <svg width="16" height="16"><use href="#i-log-out"/></svg>
+                <span>Đăng xuất</span>
+            </button>
+        </div>
+
+        <!-- Hồ sơ -->
         <div class="card">
             <div class="card-header">
                 <span class="icon"><svg width="16" height="16"><use href="#i-users"/></svg></span>
@@ -501,6 +629,7 @@
             </button>
         </div>
 
+        <!-- Giao diện -->
         <div class="card">
             <div class="card-header">
                 <span class="icon"><svg width="16" height="16"><use href="#i-palette"/></svg></span>
@@ -536,6 +665,7 @@
             </div>
         </div>
 
+        <!-- Bảo mật -->
         <div class="card">
             <div class="card-header">
                 <span class="icon"><svg width="16" height="16"><use href="#i-shield"/></svg></span>
@@ -553,8 +683,21 @@
                     <input type="password" id="set-pin-value" class="form-control" maxlength="4" inputmode="numeric" placeholder="••••">
                 </div>
             </div>
+
+            <!-- Email khôi phục -->
+            <div class="form-group" id="recovery-email-section" style="margin-top:14px;">
+                <label>Email khôi phục</label>
+                <div id="recovery-email-status" class="recovery-email-status">
+                    <span class="status-badge status-none">Chưa có</span>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm w-full" onclick="AuthUI.showAddEmail()" style="margin-top:8px;">
+                    <svg width="14" height="14"><use href="#i-plus"/></svg>
+                    <span>Thêm email khôi phục</span>
+                </button>
+            </div>
         </div>
 
+        <!-- Lương -->
         <div class="card">
             <div class="card-header">
                 <span class="icon"><svg width="16" height="16"><use href="#i-wallet"/></svg></span>
@@ -582,6 +725,7 @@
             </div>
         </div>
 
+        <!-- Hệ số tăng ca -->
         <div class="card">
             <div class="card-header">
                 <span class="icon"><svg width="16" height="16"><use href="#i-trending"/></svg></span>
@@ -599,6 +743,7 @@
             </div>
         </div>
 
+        <!-- Giờ mặc định -->
         <div class="card">
             <div class="card-header">
                 <span class="icon"><svg width="16" height="16"><use href="#i-clock"/></svg></span>
@@ -612,6 +757,7 @@
             </div>
         </div>
 
+        <!-- Sao lưu -->
         <div class="card">
             <div class="card-header">
                 <span class="icon"><svg width="16" height="16"><use href="#i-database"/></svg></span>
@@ -638,6 +784,7 @@
             <div id="backup-message" class="mt-10" style="font-weight:500;"></div>
         </div>
 
+        <!-- Xóa data cũ -->
         <div class="card">
             <div class="card-header">
                 <span class="icon"><svg width="16" height="16"><use href="#i-trash"/></svg></span>
@@ -673,14 +820,16 @@
             </button>
         </div>
         <p id="settings-message" class="mt-10" style="color:var(--success);font-weight:500;"></p>
-        <p class="app-version-footer">TimeTracker v3.3</p>
+        <p class="app-version-footer">TimeTracker v4.0 · Firebase</p>
     </div>
 </div>
 
+<!-- FAB -->
 <button class="fab" id="fab" onclick="fabAction()" aria-label="Quick check-in">
     <svg width="26" height="26"><use href="#i-zap"/></svg>
 </button>
 
+<!-- BOTTOM NAV -->
 <div class="bottom-nav">
     <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')" role="button" tabindex="0">
         <svg width="22" height="22"><use href="#i-home"/></svg>
@@ -704,15 +853,36 @@
     </div>
 </div>
 
+<!-- CONFETTI LAYER -->
 <div id="confetti-layer"></div>
 
+</div> <!-- END app-content -->
+
 <!-- ═══ SCRIPTS ═══ -->
-<script src="lunar-engine.js?v=2"></script>
-<script src="holiday-data.js?v=2"></script>
-<script src="holiday-resolver.js?v=2"></script>
+
+<!-- Firebase SDK (v9 compat — dễ dùng hơn) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<!-- App modules -->
+<script src="lunar-engine.js?v=3"></script>
+<script src="holiday-data.js?v=3"></script>
+<script src="holiday-resolver.js?v=3"></script>
+
+<!-- html2canvas (cho xuất PNG) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
-<script src="effects.js?v=2"></script>
-<script src="image-export.js?v=2"></script>
-<script src="script.js?v=2"></script>
+
+<!-- Firebase modules -->
+<script src="firebase-config.js?v=1"></script>
+<script src="auth.js?v=1"></script>
+<script src="auth-ui.js?v=1"></script>
+<script src="firebase-sync.js?v=1"></script>
+
+<!-- App -->
+<script src="effects.js?v=3"></script>
+<script src="image-export.js?v=3"></script>
+<script src="script.js?v=3"></script>
+
 </body>
 </html>
