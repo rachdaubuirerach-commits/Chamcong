@@ -1,9 +1,8 @@
 // ========================================================================
-// TIMETRACKER v4.0 — Firebase Auth + Firestore Sync
+// TIMETRACKER v3.3 — Tối ưu + Hiệu ứng
 // ========================================================================
 
-const APP_VERSION = "4.0.0";
-const DATA_KEY_PREFIX = 'firebase_data_';
+const APP_VERSION = "3.3.0";
 
 const DEFAULT_SETTINGS = {
     baseSalary: 5900000, standardWorkDays: 26, standardShiftHours: 8, breakHours: 1,
@@ -14,7 +13,7 @@ const DEFAULT_SETTINGS = {
     pinEnabled: false, pinValue: "", language: "vi"
 };
 
-// ═══ CACHE ═══
+// ═══ CACHE MANAGER ═══
 const Cache = (function () {
     const stores = { settings: null, workLogs: null, absentDays: null, notes: null };
     return {
@@ -106,6 +105,20 @@ const I18N = Object.freeze({
     }
 });
 
+// ═══ MULTI-PROFILE ═══
+function getProfiles() {
+    const s = localStorage.getItem('tt_profiles');
+    if (s) { try { return JSON.parse(s); } catch(e) {} }
+    return [{ id: 'default', name: 'Cá nhân' }];
+}
+function saveProfiles(p) { localStorage.setItem('tt_profiles', JSON.stringify(p)); }
+function getActiveProfile() { return localStorage.getItem('tt_active_profile') || 'default'; }
+function setActiveProfile(id) { localStorage.setItem('tt_active_profile', id); }
+function storageKey(base) {
+    const p = getActiveProfile();
+    return p === 'default' ? `timesheet_${base}` : `timesheet_${p}_${base}`;
+}
+
 // ═══ STATE ═══
 let settings = null;
 let workLogs = null;
@@ -124,76 +137,41 @@ let pinBuffer = "";
 const _calRenderCache = new Map();
 const _statsRenderCache = new Map();
 
-// ═══ UNIFIED DATA STORAGE ═══
-function getAllDataObject() {
-    return {
-        settings: settings,
-        workLogs: workLogs,
-        absentDays: getAbsentDays(),
-        notes: getNotes(),
-        _version: Date.now()
-    };
-}
-
-function saveAllDataToLocal() {
-    const profile = window.Auth ? window.Auth.getCurrentProfile() : null;
-    if (!profile) return;
-    const key = DATA_KEY_PREFIX + profile.username;
-    localStorage.setItem(key, JSON.stringify(getAllDataObject()));
-}
-
-function loadAllDataFromLocal() {
-    const profile = window.Auth ? window.Auth.getCurrentProfile() : null;
-    if (!profile) return null;
-    const key = DATA_KEY_PREFIX + profile.username;
-    const stored = localStorage.getItem(key);
-    if (stored) { try { return JSON.parse(stored); } catch(e) { return null; } }
-    return null;
-}
-
 // ═══ LOAD / SAVE ═══
 function loadSettings() {
-    if (!window.Auth || !window.Auth.isLoggedIn()) return { ...DEFAULT_SETTINGS };
     return Cache.get('settings', () => {
-        const allData = loadAllDataFromLocal();
-        if (allData && allData.settings) return { ...DEFAULT_SETTINGS, ...allData.settings };
+        const s = localStorage.getItem(storageKey('settings'));
+        if (s) { try { return { ...DEFAULT_SETTINGS, ...JSON.parse(s) }; } catch(e) {} }
         return { ...DEFAULT_SETTINGS };
     });
 }
 function saveSettingsToStorage() {
+    localStorage.setItem(storageKey('settings'), JSON.stringify(settings));
     Cache.set('settings', settings);
-    saveAllDataToLocal();
-    if (window.FirebaseSync && window.Auth && window.Auth.isLoggedIn()) window.FirebaseSync.queueSync();
 }
 function loadWorkLogs() {
-    if (!window.Auth || !window.Auth.isLoggedIn()) return [];
     return Cache.get('workLogs', () => {
-        const allData = loadAllDataFromLocal();
-        if (allData && Array.isArray(allData.workLogs)) return allData.workLogs;
-        return [];
+        const s = localStorage.getItem(storageKey('worklogs'));
+        try { return s ? JSON.parse(s) : []; } catch(e) { return []; }
     });
 }
 function saveWorkLogsToStorage() {
+    localStorage.setItem(storageKey('worklogs'), JSON.stringify(workLogs));
     Cache.set('workLogs', workLogs);
     _calRenderCache.clear();
     _statsRenderCache.clear();
-    saveAllDataToLocal();
-    if (window.FirebaseSync && window.Auth && window.Auth.isLoggedIn()) window.FirebaseSync.queueSync();
 }
 
 // ═══ ABSENT ═══
 function getAbsentDays() {
-    if (!window.Auth || !window.Auth.isLoggedIn()) return [];
     return Cache.get('absentDays', () => {
-        const allData = loadAllDataFromLocal();
-        if (allData && Array.isArray(allData.absentDays)) return allData.absentDays;
-        return [];
+        const s = localStorage.getItem(storageKey('absent_days'));
+        try { return s ? JSON.parse(s) : []; } catch(e) { return []; }
     });
 }
 function saveAbsentDays(days) {
+    localStorage.setItem(storageKey('absent_days'), JSON.stringify(days));
     Cache.set('absentDays', days);
-    saveAllDataToLocal();
-    if (window.FirebaseSync && window.Auth && window.Auth.isLoggedIn()) window.FirebaseSync.queueSync();
 }
 function isAbsentDay(d) { return getAbsentDays().indexOf(d) !== -1; }
 function markAbsentDay(d) {
@@ -204,41 +182,33 @@ function unmarkAbsentDay(d) { saveAbsentDays(getAbsentDays().filter(x => x !== d
 
 // ═══ NOTES ═══
 function getNotes() {
-    if (!window.Auth || !window.Auth.isLoggedIn()) return {};
     return Cache.get('notes', () => {
-        const allData = loadAllDataFromLocal();
-        if (allData && allData.notes) return allData.notes;
-        return {};
+        const s = localStorage.getItem(storageKey('notes'));
+        try { return s ? JSON.parse(s) : {}; } catch(e) { return {}; }
     });
 }
 function saveNotes(n) {
+    localStorage.setItem(storageKey('notes'), JSON.stringify(n));
     Cache.set('notes', n);
     _calRenderCache.clear();
-    saveAllDataToLocal();
-    if (window.FirebaseSync && window.Auth && window.Auth.isLoggedIn()) window.FirebaseSync.queueSync();
 }
 function getNote(d) { return getNotes()[d] || ''; }
 function setNote(d, text) {
     const n = getNotes();
-    if (text.trim()) n[d] = text.trim(); else delete n[d];
+    if (text.trim()) n[d] = text.trim();
+    else delete n[d];
     saveNotes(n);
 }
-
 function initState() {
     settings = loadSettings();
     workLogs = loadWorkLogs();
     getAbsentDays();
     getNotes();
 }
-function reloadStateFromStorage() {
+function invalidateAllCache() {
     Cache.invalidate();
-    settings = loadSettings();
-    workLogs = loadWorkLogs();
-    initMonthSelects();
-    applyTheme();
-    applyLanguage();
-    loadDashboard();
-    applyWorklogMonthFilter();
+    _calRenderCache.clear();
+    _statsRenderCache.clear();
 }
 
 // ═══ TOAST ═══
@@ -249,11 +219,13 @@ function showToast(message, type = 'success') {
         if (first) { first.remove(); _activeToasts.delete(first); }
     }
     const container = document.getElementById('toast-container');
-    if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     const icons = { success: '✅', warning: '⚠️', danger: '❌', info: 'ℹ️' };
-    toast.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span><span class="toast-message">${message}</span><button class="toast-close" aria-label="Close">✕</button>`;
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type] || 'ℹ️'}</span>
+        <span class="toast-message">${message}</span>
+        <button class="toast-close" aria-label="Close">✕</button>`;
     container.appendChild(toast);
     _activeToasts.add(toast);
     const close = () => {
@@ -298,7 +270,9 @@ function getLogsByMonth(m, y) {
     return result;
 }
 function getLogByDate(d) {
-    for (let i = 0; i < workLogs.length; i++) if (workLogs[i].date === d) return workLogs[i];
+    for (let i = 0; i < workLogs.length; i++) {
+        if (workLogs[i].date === d) return workLogs[i];
+    }
     return undefined;
 }
 function monthOptions() {
@@ -350,20 +324,27 @@ function _applyThemeRaw() {
     root.style.setProperty('--primary-dark', c.dark);
     root.style.setProperty('--primary-gradient', c.grad);
     root.style.setProperty('--primary-glow', c.glow);
+
     let mode = settings.themeMode;
     if (mode === 'auto') mode = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', mode);
+
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', c.primary);
+
     const statsPage = document.getElementById('page-statistics');
     if (statsPage && !statsPage.classList.contains('hidden')) {
         _statsRenderCache.clear();
         loadStatistics();
     }
 }
+
 function applyTheme() {
-    if (window.Effects && window.Effects.smoothThemeChange) window.Effects.smoothThemeChange(_applyThemeRaw);
-    else _applyThemeRaw();
+    if (window.Effects && window.Effects.smoothThemeChange) {
+        window.Effects.smoothThemeChange(_applyThemeRaw);
+    } else {
+        _applyThemeRaw();
+    }
 }
 
 // ═══ PAGE SWITCH ═══
@@ -383,35 +364,54 @@ function switchPage(p) {
         document.querySelectorAll('.bottom-nav .nav-item').forEach(e => e.classList.remove('active'));
         const nav = document.querySelector(`.bottom-nav .nav-item[data-page="${p}"]`);
         if (nav) nav.classList.add('active');
+
         if (p === 'dashboard') loadDashboard();
         if (p === 'calendar') renderCalendar();
         if (p === 'worklog') applyWorklogMonthFilter();
         if (p === 'statistics') loadStatistics();
-        if (p === 'settings') { loadSettingsForm(); updateDeletePreview(); renderProfileList(); AuthUI.updateRecoveryEmailStatus(); }
+        if (p === 'settings') { loadSettingsForm(); updateDeletePreview(); renderProfileList(); }
     };
     if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
         document.startViewTransition(doSwitch);
     } else doSwitch();
+    // Re-attach ripple cho elements mới
     if (window.Effects) setTimeout(() => window.Effects.attachRippleAll(), 100);
 }
 
 function goToCurrentMonth(page) {
     const now = new Date();
-    const m = now.getMonth() + 1, y = now.getFullYear();
-    if (page === 'dashboard') { document.getElementById('dash-month-select').value = m; document.getElementById('dash-year-input').value = y; loadDashboard(); }
-    else if (page === 'worklog') { document.getElementById('worklog-month-select').value = m; document.getElementById('worklog-year-input').value = y; applyWorklogMonthFilter(); }
-    else if (page === 'statistics') { document.getElementById('stat-month-select').value = m; document.getElementById('stat-year-input').value = y; loadStatistics(); }
+    const m = now.getMonth() + 1;
+    const y = now.getFullYear();
+    if (page === 'dashboard') {
+        document.getElementById('dash-month-select').value = m;
+        document.getElementById('dash-year-input').value = y;
+        loadDashboard();
+    } else if (page === 'worklog') {
+        document.getElementById('worklog-month-select').value = m;
+        document.getElementById('worklog-year-input').value = y;
+        applyWorklogMonthFilter();
+    } else if (page === 'statistics') {
+        document.getElementById('stat-month-select').value = m;
+        document.getElementById('stat-year-input').value = y;
+        loadStatistics();
+    }
 }
 
-// ═══ SHIFT MEMORY ═══
-function getMonthKey() { const d = new Date(); return `monthly_shift_${d.getFullYear()}_${d.getMonth() + 1}`; }
+// ═══ MONTHLY SHIFT ═══
+function getMonthKey() {
+    const d = new Date();
+    return `monthly_shift_${d.getFullYear()}_${d.getMonth() + 1}`;
+}
 function loadMonthlyShift() { return localStorage.getItem(getMonthKey()); }
 function saveMonthlyShift(s) { localStorage.setItem(getMonthKey(), s); }
 
+// ═══ SUGGESTED SHIFT ═══
 function getLastWorkShift() {
     if (workLogs.length === 0) return null;
     let latest = workLogs[0];
-    for (let i = 1; i < workLogs.length; i++) if (new Date(workLogs[i].date) > new Date(latest.date)) latest = workLogs[i];
+    for (let i = 1; i < workLogs.length; i++) {
+        if (new Date(workLogs[i].date) > new Date(latest.date)) latest = workLogs[i];
+    }
     return latest;
 }
 function getSuggestedShift() {
@@ -427,36 +427,54 @@ function getSuggestedShift() {
     return { shift, startTime, endTime };
 }
 
-// ═══ QUICK CHECK-IN ═══
+// ═══ QUICK CHECK-IN (có effects) ═══
 function quickCheckIn() {
     const ts = todayStr();
     if (getLogByDate(ts)) { showToast('Bạn đã chấm công hôm nay!', 'warning'); return; }
-    if (isAbsentDay(ts)) { if (!confirm('Hôm nay bạn đã xác nhận nghỉ. Đổi thành đi làm?')) return; unmarkAbsentDay(ts); }
+    if (isAbsentDay(ts)) {
+        if (!confirm('Hôm nay bạn đã xác nhận nghỉ. Đổi thành đi làm?')) return;
+        unmarkAbsentDay(ts);
+    }
     const s = getSuggestedShift();
     const isSunday = new Date().getDay() === 0;
     const r = calculateWorkLog(ts, s.shift, isSunday, s.startTime, s.endTime);
-    workLogs.push({ id: Date.now(), date: ts, shift: s.shift, isSunday, start: s.startTime, end: s.endTime, regularHours: r.regularHours, overtimeHours: r.overtimeHours, totalPay: r.totalPay });
+    workLogs.push({
+        id: Date.now(), date: ts, shift: s.shift, isSunday,
+        start: s.startTime, end: s.endTime,
+        regularHours: r.regularHours, overtimeHours: r.overtimeHours, totalPay: r.totalPay
+    });
     saveWorkLogsToStorage();
     haptic(); playSound();
+
+    // ⭐ HIỆU ỨNG: confetti + checkmark
     if (window.Effects) {
         const btn = document.querySelector('.hero-actions .btn-confirm');
-        if (btn) { const rect = btn.getBoundingClientRect(); window.Effects.miniConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2); }
-        if (window.Effects.showCheckmark) window.Effects.showCheckmark();
+        if (btn) {
+            const rect = btn.getBoundingClientRect();
+            window.Effects.miniConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        }
+        window.Effects.showCheckmark && window.Effects.showCheckmark();
     }
+
     if (r.isPaidHoliday) showToast('🎉 Chấm công ngày lễ ' + r.holiday.name, 'success');
     else showToast('✅ Chấm công thành công!', 'success');
+
     loadDashboard();
     if (!document.getElementById('page-worklog').classList.contains('hidden')) applyWorklogMonthFilter();
     if (!document.getElementById('page-calendar').classList.contains('hidden')) renderCalendar();
 }
+
 function confirmAbsent() {
     const ts = todayStr();
     if (getLogByDate(ts)) { showToast('Bạn đã chấm công hôm nay.', 'warning'); return; }
     if (isAbsentDay(ts)) { showToast('Đã xác nhận nghỉ hôm nay.', 'warning'); return; }
     if (confirm(`Xác nhận hôm nay (${ts}) bạn KHÔNG đi làm?`)) {
-        markAbsentDay(ts); loadDashboard(); showToast('✅ Đã xác nhận nghỉ.', 'success');
+        markAbsentDay(ts);
+        loadDashboard();
+        showToast('✅ Đã xác nhận nghỉ.', 'success');
     }
 }
+
 function editQuickCheckin() {
     const ts = todayStr();
     const log = getLogByDate(ts);
@@ -488,15 +506,19 @@ function renderQuickCheckin() {
     const dow = ['Chủ nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'][today.getDay()];
     const log = getLogByDate(ts);
     const absent = isAbsentDay(ts);
+
     document.getElementById('hero-date').textContent = ts;
     const dot = document.querySelector('.hero-status-dot');
     const txt = document.querySelector('.hero-status-text');
+
     const holidays = HolidayResolver.getSolarDayHolidays(ts);
     const paidHoliday = holidays.find(h => h.paid);
     const anyHoliday = paidHoliday || holidays[0];
+
     if (log) { dot.className = 'hero-status-dot'; txt.textContent = '✅ Đã chấm công'; }
     else if (absent) { dot.className = 'hero-status-dot off'; txt.textContent = '⚪ Đã nghỉ'; }
     else { dot.className = 'hero-status-dot inactive'; txt.textContent = '⏳ Chưa chấm công'; }
+
     let holidayBanner = '';
     if (anyHoliday) {
         const label = paidHoliday ? `⚡ Lễ có lương — đi làm x${settings.otHoliday}` : 'Ngày lễ';
@@ -509,6 +531,7 @@ function renderQuickCheckin() {
                 </div>
             </div>`;
     }
+
     if (log) {
         content.innerHTML = holidayBanner + `
             <div class="checked-in">
@@ -562,6 +585,7 @@ function loadDashboard() {
     const ms = document.getElementById('dash-month-select');
     const ys = document.getElementById('dash-year-input');
     if (ms && ys) { dashMonth = parseInt(ms.value); dashYear = parseInt(ys.value); }
+
     const logs = getLogsByMonth(dashMonth, dashYear);
     const totalDays = logs.length;
     let totalHours = 0, totalOT = 0, currentSalary = 0;
@@ -570,15 +594,23 @@ function loadDashboard() {
         totalOT += logs[i].overtimeHours;
         currentSalary += logs[i].totalPay;
     }
+
     const el1 = document.getElementById('dash-total-days');
     const el2 = document.getElementById('dash-total-hours');
     const el3 = document.getElementById('dash-total-ot');
     const el4 = document.getElementById('dash-current-salary');
+
     el1.innerText = totalDays;
     el2.innerText = totalHours.toFixed(2);
     el3.innerText = totalOT.toFixed(2);
     el4.innerText = currentSalary.toLocaleString('vi-VN') + ' đ';
-    if (window.Effects) { window.Effects.pulse(el1); window.Effects.pulse(el4); }
+
+    // Hiệu ứng pulse khi update
+    if (window.Effects) {
+        window.Effects.pulse(el1);
+        window.Effects.pulse(el4);
+    }
+
     const now = new Date();
     const isCur = dashMonth === now.getMonth() + 1 && dashYear === now.getFullYear();
     if (isCur) {
@@ -598,10 +630,12 @@ function loadDashboard() {
         document.getElementById('dash-progress-fill').style.width = '0%';
         document.getElementById('dash-progress-percent').innerText = '0%';
     }
+
     document.getElementById('dash-base-salary').innerText = settings.baseSalary.toLocaleString('vi-VN') + ' đ';
     document.getElementById('dash-standard-days').innerText = settings.standardWorkDays;
     document.getElementById('dash-shift-count').innerText = totalDays;
     document.getElementById('dash-current-view').innerHTML = `${String(dashMonth).padStart(2,'0')}/${dashYear}`;
+
     renderQuickCheckin();
     renderGoal(currentSalary);
     renderAchievements();
@@ -613,7 +647,10 @@ let goalCelebrated = false;
 function renderGoal(currentSalary) {
     const goal = settings.monthlyGoal || 0;
     const body = document.getElementById('goal-body');
-    if (!goal) { body.innerHTML = `<p class="text-muted" style="font-size:13px;">Chưa đặt mục tiêu. Nhấn nút sửa để đặt.</p>`; return; }
+    if (!goal) {
+        body.innerHTML = `<p class="text-muted" style="font-size:13px;">Chưa đặt mục tiêu. Nhấn nút sửa để đặt.</p>`;
+        return;
+    }
     const pct = Math.min((currentSalary / goal) * 100, 100);
     const achieved = currentSalary >= goal;
     body.innerHTML = `
@@ -683,6 +720,7 @@ function renderAchievements() {
     if (streak >= 3) items.push({ icon:'🔥', name:`Chuỗi ${streak} ngày`, val:`Streak hiện tại`, color:'#F59E0B' });
     if (totalAll >= 10) items.push({ icon:'📚', name:`${totalAll} ngày tổng`, val:'Tổng chấm công', color:'#6366F1' });
     if (bestVal > 0) items.push({ icon:'🏆', name:bestVal.toLocaleString('vi-VN')+' đ', val:`Tháng tốt nhất: ${bestKey}`, color:'#10B981' });
+
     if (items.length === 0) { card.classList.add('hidden'); return; }
     card.classList.remove('hidden');
     list.innerHTML = items.map(i => `
@@ -710,7 +748,9 @@ function checkReminder() {
 // ═══ CALENDAR ═══
 function switchCalTab(tab) {
     calTab = tab;
-    document.querySelectorAll('.cal-mode-tabs button').forEach(b => { b.classList.toggle('active', b.dataset.calTab === tab); });
+    document.querySelectorAll('.cal-mode-tabs button').forEach(b => {
+        b.classList.toggle('active', b.dataset.calTab === tab);
+    });
     renderCalendar();
 }
 function initLunarState() {
@@ -730,6 +770,7 @@ function renderSolarTab() {
     const weekdays = document.getElementById('calendar-weekdays');
     title.textContent = `📅 Tháng ${calMonth}/${calYear}`;
     weekdays.innerHTML = '<div>CN</div><div>T2</div><div>T3</div><div>T4</div><div>T5</div><div>T6</div><div>T7</div>';
+
     const first = new Date(calYear, calMonth - 1, 1);
     const firstDow = first.getDay();
     const dim = new Date(calYear, calMonth, 0).getDate();
@@ -737,6 +778,7 @@ function renderSolarTab() {
     let html = '';
     const prevDim = new Date(calYear, calMonth - 1, 0).getDate();
     for (let i = firstDow - 1; i >= 0; i--) html += `<div class="cal-cell other">${prevDim - i}</div>`;
+
     for (let d = 1; d <= dim; d++) {
         const ds = `${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const dObj = new Date(calYear, calMonth - 1, d);
@@ -746,6 +788,7 @@ function renderSolarTab() {
         const absent = isAbsentDay(ds);
         const holidays = HolidayResolver.getSolarDayHolidays(ds);
         const mainHoliday = holidays.find(h => h.paid) || holidays[0];
+
         let cls = 'cal-cell';
         if (isToday) cls += ' today';
         if (log) cls += ' done';
@@ -767,6 +810,7 @@ function renderSolarTab() {
     const total = firstDow + dim;
     const fill = (7 - (total % 7)) % 7;
     for (let i = 1; i <= fill; i++) html += `<div class="cal-cell other">${i}</div>`;
+
     grid.className = 'calendar-grid solar-grid';
     grid.innerHTML = html;
 }
@@ -778,18 +822,26 @@ function renderLunarTab() {
     const canChi = LunarEngine.getCanChi(calLunarYear);
     title.textContent = `🌙 Tháng ${calLunarMonth} — ${canChi}`;
     weekdays.innerHTML = '<div>CN</div><div>T2</div><div>T3</div><div>T4</div><div>T5</div><div>T6</div><div>T7</div>';
+
     const days = LunarEngine.getLunarMonthDays(calLunarMonth, calLunarYear);
-    if (days.length === 0) { grid.className = 'calendar-grid lunar-grid'; grid.innerHTML = '<p class="text-muted" style="text-align:center;padding:20px;grid-column:1/-1;">Không có dữ liệu</p>'; return; }
+    if (days.length === 0) {
+        grid.className = 'calendar-grid lunar-grid';
+        grid.innerHTML = '<p class="text-muted" style="text-align:center;padding:20px;grid-column:1/-1;">Không có dữ liệu</p>';
+        return;
+    }
     const ts = todayStr();
     const firstDay = days[0];
     const firstDate = new Date(firstDay.solarYear, firstDay.solarMonth - 1, firstDay.solarDay);
     const firstDow = firstDate.getDay();
+
     let prevMonth = calLunarMonth - 1, prevYear = calLunarYear;
     if (prevMonth < 1) { prevMonth = 12; prevYear--; }
     const prevDays = LunarEngine.getLunarMonthDays(prevMonth, prevYear);
     const prevLen = prevDays.length;
     let html = '';
-    for (let i = firstDow - 1; i >= 0; i--) html += `<div class="lunar-cell-view other"><div class="lunar-day-number">${prevLen - i}</div></div>`;
+    for (let i = firstDow - 1; i >= 0; i--) {
+        html += `<div class="lunar-cell-view other"><div class="lunar-day-number">${prevLen - i}</div></div>`;
+    }
     days.forEach(d => {
         const holidays = HolidayResolver.getLunarDayHolidays(d.lunarDay, calLunarMonth, calLunarYear);
         const mainHoliday = holidays.find(h => h.paid) || holidays[0];
@@ -810,24 +862,40 @@ function renderLunarTab() {
         }
         const badge = mainHoliday ? `<div class="holiday-badge" title="${mainHoliday.name}">${mainHoliday.icon}</div>` : '';
         let payDot = '';
-        if (log) { const level = log.totalPay > 800000 ? 'high' : log.totalPay > 400000 ? 'mid' : 'low'; payDot = `<div class="cal-pay-dot ${level}"></div>`; }
+        if (log) {
+            const level = log.totalPay > 800000 ? 'high' : log.totalPay > 400000 ? 'mid' : 'low';
+            payDot = `<div class="cal-pay-dot ${level}"></div>`;
+        }
         const note = getNote(solarDs) ? '<div class="cal-note-dot"></div>' : '';
         html += `<div class="${cls}" onclick="showLunarDetail(${d.lunarDay}, ${calLunarMonth}, ${calLunarYear})">${badge}<div class="lunar-day-number">${d.lunarDay}</div>${payDot}${note}</div>`;
     });
     const totalCells = firstDow + days.length;
     const fill = (7 - (totalCells % 7)) % 7;
     for (let i = 1; i <= fill; i++) html += `<div class="lunar-cell-view other"><div class="lunar-day-number">${i}</div></div>`;
+
     grid.className = 'calendar-grid lunar-grid';
     grid.innerHTML = html;
 }
 function calPrev() {
-    if (calTab === 'lunar') { initLunarState(); calLunarMonth--; if (calLunarMonth < 1) { calLunarMonth = 12; calLunarYear--; } }
-    else { calMonth--; if (calMonth < 1) { calMonth = 12; calYear--; } }
+    if (calTab === 'lunar') {
+        initLunarState();
+        calLunarMonth--;
+        if (calLunarMonth < 1) { calLunarMonth = 12; calLunarYear--; }
+    } else {
+        calMonth--;
+        if (calMonth < 1) { calMonth = 12; calYear--; }
+    }
     renderCalendar();
 }
 function calNext() {
-    if (calTab === 'lunar') { initLunarState(); calLunarMonth++; if (calLunarMonth > 12) { calLunarMonth = 1; calLunarYear++; } }
-    else { calMonth++; if (calMonth > 12) { calMonth = 1; calYear++; } }
+    if (calTab === 'lunar') {
+        initLunarState();
+        calLunarMonth++;
+        if (calLunarMonth > 12) { calLunarMonth = 1; calLunarYear++; }
+    } else {
+        calMonth++;
+        if (calMonth > 12) { calMonth = 1; calYear++; }
+    }
     renderCalendar();
 }
 function calToday() {
@@ -850,6 +918,7 @@ function showCalDetail(ds) {
     const [y, m, d] = ds.split('-').map(Number);
     const lunarInfo = LunarEngine.toLunar(d, m, y);
     const holidays = HolidayResolver.getSolarDayHolidays(ds);
+
     const lunarBlock = `
         <div style="background:var(--surface-2);padding:10px 12px;border-radius:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
             <div>
@@ -861,9 +930,15 @@ function showCalDetail(ds) {
                 <div style="font-size:13px;font-weight:700;color:var(--gray-700);">${lunarInfo.canChi}</div>
             </div>
         </div>`;
+
     let holidayBlock = '';
     holidays.forEach(h => {
-        const bg = h.paid ? 'linear-gradient(135deg,#FEE2E2,#FECACA)' : h.category === 'social' ? 'linear-gradient(135deg,#FEF3C7,#FDE68A)' : h.category === 'trad' ? 'linear-gradient(135deg,#FFEDD5,#FED7AA)' : h.category === 'religion' ? 'linear-gradient(135deg,#EDE9FE,#DDD6FE)' : 'var(--surface-2)';
+        const bg = h.paid
+            ? 'linear-gradient(135deg,#FEE2E2,#FECACA)'
+            : h.category === 'social'   ? 'linear-gradient(135deg,#FEF3C7,#FDE68A)'
+            : h.category === 'trad'     ? 'linear-gradient(135deg,#FFEDD5,#FED7AA)'
+            : h.category === 'religion' ? 'linear-gradient(135deg,#EDE9FE,#DDD6FE)'
+            : 'var(--surface-2)';
         const border = h.paid ? 'border-left:4px solid #DC2626;' : '';
         const sysLabel = h.system === 'solar' ? '📅 Lễ Dương lịch' : h.system === 'lunar' ? '🌙 Lễ Âm lịch' : '📿 Định kỳ';
         holidayBlock += `
@@ -873,6 +948,7 @@ function showCalDetail(ds) {
                 ${h.paid ? `<div style="font-size:12px;color:#DC2626;font-weight:700;margin-top:4px;">⚡ Lễ có lương — đi làm hưởng x${settings.otHoliday}</div>` : ''}
             </div>`;
     });
+
     if (log) {
         const dayType = log.isSunday ? 'Chủ nhật' : 'Ngày thường';
         const holidayTag = log.isPaidHoliday ? ' <span style="color:#DC2626;font-weight:700;">⚡ Ngày lễ</span>' : '';
@@ -988,10 +1064,15 @@ function renderDailyChart(logs, m, y) {
     const tc = getThemeColors();
     let bars = '';
     data.forEach((v,i) => {
-        if (v > 0) { const h = (v / max) * (H - pad*2); bars += `<rect x="${pad + i * bw + 1}" y="${H - pad - h}" width="${bw-2}" height="${h}" rx="2" fill="url(#barGrad)"/>`; }
+        if (v > 0) {
+            const h = (v / max) * (H - pad*2);
+            bars += `<rect x="${pad + i * bw + 1}" y="${H - pad - h}" width="${bw-2}" height="${h}" rx="2" fill="url(#barGrad)"/>`;
+        }
     });
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;">
-        <defs><linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${tc.primaryLight}"/><stop offset="100%" stop-color="${tc.primary}"/></linearGradient></defs>
+        <defs><linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${tc.primaryLight}"/><stop offset="100%" stop-color="${tc.primary}"/>
+        </linearGradient></defs>
         <line x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}" stroke="${tc.gray300}" stroke-width="1"/>
         ${bars}
         <text x="${pad}" y="${H-4}" font-size="9" fill="${tc.gray400}">1</text>
@@ -1012,7 +1093,8 @@ function renderShiftChart(morning, night) {
     el.innerHTML = `<div style="display:flex;align-items:center;gap:20px;justify-content:center;padding:10px 0;">
         <svg width="160" height="140" viewBox="0 0 160 140">
             <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#FCD34D" stroke-width="22"/>
-            <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${tc.primary}" stroke-width="22" stroke-dasharray="${mDash} ${circ}" stroke-dashoffset="0" transform="rotate(-90 ${cx} ${cy})"/>
+            <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${tc.primary}" stroke-width="22"
+                stroke-dasharray="${mDash} ${circ}" stroke-dashoffset="0" transform="rotate(-90 ${cx} ${cy})"/>
             <text x="${cx}" y="${cy+5}" text-anchor="middle" font-size="16" font-weight="800" fill="${tc.gray500}">${total}</text>
         </svg>
         <div style="display:flex;flex-direction:column;gap:10px;">
@@ -1039,7 +1121,10 @@ function renderTrendChart() {
     const areaPath = path + ` L${coords[coords.length-1].x},${H-pad} L${coords[0].x},${H-pad} Z`;
     const tc = getThemeColors();
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;">
-        <defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${tc.primary}" stop-opacity="0.4"/><stop offset="100%" stop-color="${tc.primary}" stop-opacity="0"/></linearGradient></defs>
+        <defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${tc.primary}" stop-opacity="0.4"/>
+            <stop offset="100%" stop-color="${tc.primary}" stop-opacity="0"/>
+        </linearGradient></defs>
         <line x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}" stroke="${tc.gray300}" stroke-width="1"/>
         <path d="${areaPath}" fill="url(#areaGrad)"/>
         <path d="${path}" fill="none" stroke="${tc.primary}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1054,7 +1139,8 @@ function getExportRows() {
     const y = parseInt(document.getElementById('stat-year-input').value);
     const logs = getLogsByMonth(m, y).sort((a,b) => new Date(a.date) - new Date(b.date));
     return logs.map(l => ({
-        date: l.date, shift: l.shift, type: l.isSunday ? 'Chủ nhật' : 'Thường',
+        date: l.date, shift: l.shift,
+        type: l.isSunday ? 'Chủ nhật' : 'Thường',
         start: l.start, end: l.end,
         reg: l.regularHours.toFixed(2), ot: l.overtimeHours.toFixed(2),
         note: getNote(l.date) || ''
@@ -1143,7 +1229,10 @@ function addWorkLog() {
     const end = document.getElementById('worklog-end').value;
     const note = document.getElementById('worklog-note').value;
     const idx = workLogs.findIndex(l => l.date === date && l.shift === shift);
-    if (idx !== -1) { if (!confirm('Đã có bản ghi cho ngày này. Ghi đè?')) return; workLogs.splice(idx, 1); }
+    if (idx !== -1) {
+        if (!confirm('Đã có bản ghi cho ngày này. Ghi đè?')) return;
+        workLogs.splice(idx, 1);
+    }
     const c = calculateWorkLog(date, shift, isSun, start, end);
     workLogs.push({ id: Date.now(), date, shift, isSunday: isSun, start, end, regularHours: c.regularHours, overtimeHours: c.overtimeHours, totalPay: c.totalPay });
     setNote(date, note);
@@ -1282,18 +1371,12 @@ function resetSettings() {
     showToast('↺ Đã khôi phục mặc định.', 'warning');
 }
 function highlightThemeSwatch() {
-    document.querySelectorAll('.theme-swatch').forEach(s => { s.classList.toggle('active', s.dataset.themeColor === settings.themeColor); });
+    document.querySelectorAll('.theme-swatch').forEach(s => {
+        s.classList.toggle('active', s.dataset.themeColor === settings.themeColor);
+    });
 }
 
-// ═══ PROFILES (Sub-profiles) ═══
-function getProfiles() {
-    const s = localStorage.getItem('tt_sub_profiles');
-    if (s) { try { return JSON.parse(s); } catch(e) {} }
-    return [{ id: 'default', name: 'Cá nhân' }];
-}
-function saveProfiles(p) { localStorage.setItem('tt_sub_profiles', JSON.stringify(p)); }
-function getActiveProfile() { return localStorage.getItem('tt_active_sub_profile') || 'default'; }
-function setActiveProfile(id) { localStorage.setItem('tt_active_sub_profile', id); }
+// ═══ PROFILES ═══
 function renderProfileList() {
     const list = document.getElementById('profile-list');
     const profiles = getProfiles();
@@ -1308,14 +1391,17 @@ function renderProfileList() {
 }
 function switchProfile(id) {
     if (id === getActiveProfile()) return;
-    if (!confirm('Chuyển hồ sơ con? Dữ liệu sẽ thay đổi theo hồ sơ.')) return;
+    if (!confirm('Chuyển hồ sơ? Dữ liệu sẽ thay đổi theo hồ sơ.')) return;
     setActiveProfile(id);
-    Cache.invalidate();
+    invalidateAllCache();
     settings = loadSettings();
     workLogs = loadWorkLogs();
-    applyTheme(); applyLanguage();
+    applyTheme();
+    applyLanguage();
     renderProfileList();
-    loadDashboard();
+    const p = getProfiles().find(x => x.id === id);
+    document.getElementById('profile-name').textContent = p ? p.name : 'TimeTracker';
+    switchPage('dashboard');
     showToast('✅ Đã chuyển hồ sơ.', 'success');
 }
 function addNewProfile() {
@@ -1329,11 +1415,14 @@ function addNewProfile() {
     showToast('✅ Đã thêm hồ sơ.', 'success');
 }
 function deleteProfile(id) {
-    if (!confirm('Xóa hồ sơ này?')) return;
+    if (!confirm('Xóa hồ sơ này và toàn bộ dữ liệu?')) return;
     saveProfiles(getProfiles().filter(p => p.id !== id));
+    Object.keys(localStorage).forEach(k => {
+        if (k.includes('_' + id + '_') || k.endsWith('_' + id)) localStorage.removeItem(k);
+    });
+    invalidateAllCache();
     if (getActiveProfile() === id) {
         setActiveProfile('default');
-        Cache.invalidate();
         settings = loadSettings();
         workLogs = loadWorkLogs();
         renderProfileList();
@@ -1345,7 +1434,12 @@ function deleteProfile(id) {
 
 // ═══ BACKUP ═══
 function getAllData() {
-    return { version: APP_VERSION, exportedAt: new Date().toISOString(), settings, workLogs, absentDays: getAbsentDays(), notes: getNotes() };
+    const shiftKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('monthly_shift_')) shiftKeys.push({ key: k, value: localStorage.getItem(k) });
+    }
+    return { version: APP_VERSION, exportedAt: new Date().toISOString(), settings, workLogs, monthlyShifts: shiftKeys, absentDays: getAbsentDays(), notes: getNotes() };
 }
 function exportBackup() {
     const data = getAllData();
@@ -1374,8 +1468,10 @@ function handleRestoreFile(event) {
                 <p>📅 Tạo lúc: <strong>${new Date(data.exportedAt).toLocaleString('vi-VN')}</strong></p>
                 <p>📝 Số bản ghi: <strong>${logCount}</strong></p>
                 <p>📊 Khoảng: <strong>${range}</strong></p>
+                <p>⚙️ Lương: <strong>${data.settings.baseSalary.toLocaleString('vi-VN')} đ</strong></p>
                 <p style="color:#d63384;font-weight:bold;margin-top:8px;">⚠️ Sẽ thay thế toàn bộ dữ liệu hiện tại!</p>`;
             document.getElementById('restore-info').style.display = 'block';
+            document.getElementById('backup-message').innerHTML = '';
         } catch (err) {
             showToast('Lỗi: ' + err.message, 'danger');
             document.getElementById('restore-info').style.display = 'none';
@@ -1389,15 +1485,16 @@ function confirmRestore() {
     if (!restoreData) { showToast('Không có dữ liệu.', 'danger'); return; }
     if (!confirm(`Khôi phục ${restoreData.workLogs.length} bản ghi? Dữ liệu hiện tại sẽ bị thay thế.`)) return;
     try {
+        const bk = 'timesheet_auto_backup_' + new Date().toISOString().replace(/[:.]/g,'-');
+        localStorage.setItem(bk, JSON.stringify(getAllData()));
         settings = { ...DEFAULT_SETTINGS, ...restoreData.settings };
+        saveSettingsToStorage();
         workLogs = restoreData.workLogs.map(l => ({ ...l, regularHours: parseFloat(l.regularHours) || 0, overtimeHours: parseFloat(l.overtimeHours) || 0, totalPay: parseInt(l.totalPay) || 0 }));
+        saveWorkLogsToStorage();
+        if (restoreData.monthlyShifts) restoreData.monthlyShifts.forEach(i => localStorage.setItem(i.key, i.value));
         if (restoreData.absentDays) saveAbsentDays(restoreData.absentDays);
         if (restoreData.notes) saveNotes(restoreData.notes);
-        saveSettingsToStorage();
-        saveWorkLogsToStorage();
-        Cache.invalidate();
-        settings = loadSettings();
-        workLogs = loadWorkLogs();
+        invalidateAllCache();
         applyTheme(); applyLanguage();
         showToast(`✅ Đã khôi phục ${workLogs.length} bản ghi!`, 'success');
         document.getElementById('restore-info').style.display = 'none';
@@ -1405,7 +1502,9 @@ function confirmRestore() {
         loadDashboard();
         applyWorklogMonthFilter();
         loadSettingsForm();
-    } catch (err) { showToast('Lỗi: ' + err.message, 'danger'); }
+    } catch (err) {
+        showToast('Lỗi: ' + err.message, 'danger');
+    }
 }
 function cancelRestore() {
     restoreData = null;
@@ -1435,8 +1534,13 @@ function handlePinInput(num) {
             document.getElementById('pin-error').textContent = '';
         } else {
             document.getElementById('pin-error').textContent = '❌ Sai PIN!';
+            document.querySelector('.pin-box').classList.add('shake');
             if (window.Effects) window.Effects.shake(document.querySelector('.pin-box'));
-            setTimeout(() => { pinBuffer = ''; updatePinDots(); }, 400);
+            setTimeout(() => {
+                document.querySelector('.pin-box').classList.remove('shake');
+                pinBuffer = '';
+                updatePinDots();
+            }, 400);
         }
     }
 }
@@ -1444,7 +1548,6 @@ function handlePinInput(num) {
 // ═══ SPLASH ═══
 function hideSplash() {
     const s = document.getElementById('splash-screen');
-    if (!s) return;
     setTimeout(() => { s.classList.add('hide'); setTimeout(() => s.remove(), 600); }, 1600);
 }
 
@@ -1455,20 +1558,24 @@ function setupTopBarScroll() {
     let ticking = false;
     window.addEventListener('scroll', () => {
         if (!ticking) {
-            requestAnimationFrame(() => { topBar.classList.toggle('scrolled', window.scrollY > 8); ticking = false; });
+            requestAnimationFrame(() => {
+                topBar.classList.toggle('scrolled', window.scrollY > 8);
+                ticking = false;
+            });
             ticking = true;
         }
     }, { passive: true });
 }
 
-// ═══ INIT APP ═══
-function initApp() {
+// ═══ INIT ═══
+window.onload = function () {
     initState();
     applyTheme();
     initMonthSelects();
 
     const now = new Date();
     const m = now.getMonth() + 1, y = now.getFullYear();
+
     document.getElementById('dash-month-select').value = m;
     document.getElementById('dash-year-input').value = y;
     document.getElementById('worklog-month-select').value = m;
@@ -1480,92 +1587,87 @@ function initApp() {
 
     applyLanguage();
 
-    if (!initApp._bound) {
-        initApp._bound = true;
+    document.getElementById('worklog-date').addEventListener('change', () => { autoDetectSunday(); applyMonthlyShift(); });
+    document.getElementById('worklog-shift').addEventListener('change', function() { autoSetTimes(); saveMonthlyShift(this.value); });
+    document.getElementById('worklog-start').addEventListener('change', previewWorkLog);
+    document.getElementById('worklog-end').addEventListener('change', previewWorkLog);
+    document.getElementById('worklog-type').addEventListener('change', previewWorkLog);
+    document.getElementById('delete-month').addEventListener('change', updateDeletePreview);
+    document.getElementById('delete-year').addEventListener('input', updateDeletePreview);
 
-        document.getElementById('worklog-date').addEventListener('change', () => { autoDetectSunday(); applyMonthlyShift(); });
-        document.getElementById('worklog-shift').addEventListener('change', function() { autoSetTimes(); saveMonthlyShift(this.value); });
-        document.getElementById('worklog-start').addEventListener('change', previewWorkLog);
-        document.getElementById('worklog-end').addEventListener('change', previewWorkLog);
-        document.getElementById('worklog-type').addEventListener('change', previewWorkLog);
-        document.getElementById('delete-month').addEventListener('change', updateDeletePreview);
-        document.getElementById('delete-year').addEventListener('input', updateDeletePreview);
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+        const modes = ['auto','light','dark'];
+        const i = modes.indexOf(settings.themeMode);
+        settings.themeMode = modes[(i+1) % 3];
+        saveSettingsToStorage();
+        applyTheme();
+        const names = { auto:'🌓 Tự động', light:'☀️ Sáng', dark:'🌙 Tối' };
+        showToast('🎨 ' + names[settings.themeMode], 'info');
+    });
+    document.getElementById('lang-toggle').addEventListener('click', () => {
+        settings.language = settings.language === 'vi' ? 'en' : 'vi';
+        saveSettingsToStorage();
+        applyLanguage();
+        const activePage = document.querySelector('.bottom-nav .nav-item.active').dataset.page;
+        switchPage(activePage);
+        showToast(settings.language === 'vi' ? '🇻🇳 Tiếng Việt' : '🇬🇧 English', 'info');
+    });
 
-        document.getElementById('theme-toggle').addEventListener('click', () => {
-            const modes = ['auto','light','dark'];
-            const i = modes.indexOf(settings.themeMode);
-            settings.themeMode = modes[(i+1) % 3];
+    document.querySelectorAll('.theme-swatch').forEach(s => {
+        s.addEventListener('click', () => {
+            settings.themeColor = s.dataset.themeColor;
             saveSettingsToStorage();
             applyTheme();
-            const names = { auto:'🌓 Tự động', light:'☀️ Sáng', dark:'🌙 Tối' };
-            showToast('🎨 ' + names[settings.themeMode], 'info');
+            highlightThemeSwatch();
         });
-        document.getElementById('lang-toggle').addEventListener('click', () => {
-            settings.language = settings.language === 'vi' ? 'en' : 'vi';
-            saveSettingsToStorage();
-            applyLanguage();
-            const activePage = document.querySelector('.bottom-nav .nav-item.active').dataset.page;
-            switchPage(activePage);
-            showToast(settings.language === 'vi' ? '🇻🇳 Tiếng Việt' : '🇬🇧 English', 'info');
-        });
+    });
+    document.getElementById('theme-mode-select').addEventListener('change', function() {
+        settings.themeMode = this.value;
+        saveSettingsToStorage();
+        applyTheme();
+    });
+    document.getElementById('set-pin-enabled').addEventListener('change', function() {
+        document.getElementById('pin-setup').style.display = this.checked ? 'block' : 'none';
+    });
 
-        const syncBtn = document.getElementById('sync-btn');
-        if (syncBtn) {
-            syncBtn.addEventListener('click', () => {
-                if (window.FirebaseSync) {
-                    window.FirebaseSync.smartSync().then(result => {
-                        if (result && result.action === 'download') {
-                            showToast('☁️ Đã tải data mới từ cloud', 'success');
-                            reloadStateFromStorage();
-                        } else if (result && result.action === 'upload') {
-                            showToast('☁️ Đã upload data lên cloud', 'success');
-                        } else {
-                            showToast('✅ Data đã được đồng bộ', 'info');
-                        }
-                    });
-                }
-            });
-        }
+    document.getElementById('pin-pad').addEventListener('click', e => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        handlePinInput(btn.dataset.num);
+    });
 
-        document.querySelectorAll('.theme-swatch').forEach(s => {
-            s.addEventListener('click', () => { settings.themeColor = s.dataset.themeColor; saveSettingsToStorage(); applyTheme(); highlightThemeSwatch(); });
-        });
-        document.getElementById('theme-mode-select').addEventListener('change', function() { settings.themeMode = this.value; saveSettingsToStorage(); applyTheme(); });
-        document.getElementById('set-pin-enabled').addEventListener('change', function() { document.getElementById('pin-setup').style.display = this.checked ? 'block' : 'none'; });
-        document.getElementById('pin-pad').addEventListener('click', e => { const btn = e.target.closest('button'); if (!btn) return; handlePinInput(btn.dataset.num); });
-        matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (settings.themeMode === 'auto') applyTheme(); });
-
-        document.querySelectorAll('.bottom-nav .nav-item').forEach(item => {
-            item.addEventListener('keydown', e => {
-                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchPage(item.dataset.page); }
-            });
-        });
-
-        if (window.FirebaseSync) {
-            window.FirebaseSync.onSyncState((state, error) => {
-                const btn = document.getElementById('sync-btn');
-                if (!btn) return;
-                btn.classList.remove('syncing', 'synced', 'error');
-                if (state === 'uploading' || state === 'downloading' || state === 'checking') btn.classList.add('syncing');
-                else if (state === 'success' || state === 'synced') { btn.classList.add('synced'); setTimeout(() => btn.classList.remove('synced'), 2000); }
-                else if (state === 'error') btn.classList.add('error');
-            });
-        }
-    }
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (settings.themeMode === 'auto') applyTheme();
+    });
 
     document.getElementById('worklog-date').value = todayStr();
     applyMonthlyShift();
     autoDetectSunday();
+
+    initPinLock();
+    hideSplash();
 
     switchPage('dashboard');
     applyWorklogMonthFilter();
 
     setupTopBarScroll();
 
-    setTimeout(() => { if (window.Effects) window.Effects.autoAttach(); }, 100);
+    // ⭐ Khởi tạo hiệu ứng
+    setTimeout(() => {
+        if (window.Effects) window.Effects.autoAttach();
+    }, 100);
+
+    document.querySelectorAll('.bottom-nav .nav-item').forEach(item => {
+        item.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                switchPage(item.dataset.page);
+            }
+        });
+    });
 
     setInterval(checkReminder, 30 * 60 * 1000);
-}
+};
 
 // ═══ CALCULATE ═══
 function calculateWorkLog(workDate, shift, isSunday, startTimeStr, endTimeStr) {
@@ -1641,50 +1743,11 @@ function calculateWorkLog(workDate, shift, isSunday, startTimeStr, endTimeStr) {
         else coeff = shift === 'Sáng' ? settings.otNormalDay : settings.otNormalNight;
         overtimePay = overtimeHours * hourlyRate * coeff;
     }
-    return { regularHours, overtimeHours, totalPay: Math.round(regularPay + overtimePay), isPaidHoliday: !!paidHoliday, holiday: paidHoliday };
+    return {
+        regularHours,
+        overtimeHours,
+        totalPay: Math.round(regularPay + overtimePay),
+        isPaidHoliday: !!paidHoliday,
+        holiday: paidHoliday
+    };
 }
-
-// ═══ FIREBASE INTEGRATION ═══
-window.updateUserInfo = function (profile) {
-    if (!profile) return;
-    const nameEl = document.getElementById('profile-name');
-    if (nameEl) nameEl.textContent = profile.displayName || profile.username;
-    const avatarEl = document.getElementById('settings-avatar');
-    if (avatarEl) avatarEl.textContent = (profile.username || 'U').charAt(0).toUpperCase();
-    const usernameEl = document.getElementById('settings-username');
-    if (usernameEl) usernameEl.textContent = profile.username;
-    const emailEl = document.getElementById('settings-email');
-    if (emailEl) {
-        if (profile.hasRealEmail && profile.email) emailEl.textContent = profile.email;
-        else emailEl.textContent = 'Chưa có email khôi phục';
-    }
-};
-
-window.onDataSynced = function (data) {
-    Cache.invalidate();
-    settings = loadSettings();
-    workLogs = loadWorkLogs();
-    loadDashboard();
-    applyWorklogMonthFilter();
-    renderCalendar();
-};
-
-window.initApp = function () {
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => initApp());
-    } else initApp();
-};
-
-// ═══ BOOTSTRAP ═══
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 TimeTracker v' + APP_VERSION + ' starting...');
-    try {
-        await window.Auth.init();
-        window.AuthUI.init();
-        window.FirebaseSync.init();
-        console.log('✅ Firebase initialized');
-    } catch (err) {
-        console.error('❌ Firebase init failed:', err);
-        if (window.showToast) window.showToast('Lỗi kết nối server. Kiểm tra mạng!', 'danger');
-    }
-});
