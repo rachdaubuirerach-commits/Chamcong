@@ -1,8 +1,8 @@
 // ========================================================================
-// TIMETRACKER v3.3 — Tối ưu + Hiệu ứng
+// TIMETRACKER v4.0 — Tính giờ theo quy tắc công ty
 // ========================================================================
 
-const APP_VERSION = "3.3.0";
+const APP_VERSION = "4.0.0";
 
 const DEFAULT_SETTINGS = {
     baseSalary: 5900000, standardWorkDays: 26, standardShiftHours: 8, breakHours: 1,
@@ -13,7 +13,7 @@ const DEFAULT_SETTINGS = {
     pinEnabled: false, pinValue: "", language: "vi"
 };
 
-// ═══ CACHE MANAGER ═══
+// ═══ CACHE ═══
 const Cache = (function () {
     const stores = { settings: null, workLogs: null, absentDays: null, notes: null };
     return {
@@ -374,7 +374,6 @@ function switchPage(p) {
     if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
         document.startViewTransition(doSwitch);
     } else doSwitch();
-    // Re-attach ripple cho elements mới
     if (window.Effects) setTimeout(() => window.Effects.attachRippleAll(), 100);
 }
 
@@ -427,17 +426,56 @@ function getSuggestedShift() {
     return { shift, startTime, endTime };
 }
 
-// ═══ QUICK CHECK-IN (có effects) ═══
+// ═══ QUICK CHECK-IN — Thông minh ═══
 function quickCheckIn() {
-    const ts = todayStr();
-    if (getLogByDate(ts)) { showToast('Bạn đã chấm công hôm nay!', 'warning'); return; }
+    const now = new Date();
+    const hour = now.getHours();
+    const hasHistory = workLogs.length > 0;
+
+    let ts;
+
+    // Xác định ngày chấm công
+    if (hour < 8) {
+        if (hasHistory) {
+            // Có lịch sử → dùng ca gợi ý
+            const suggested = getSuggestedShift();
+            if (suggested.shift === 'Đêm') {
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                ts = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+                showToast(`⏰ Chấm cho ca đêm ngày ${ts}`, 'info');
+            } else {
+                ts = todayStr();
+            }
+        } else {
+            // Lần đầu → hỏi user
+            const today = todayStr();
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+
+            const choice = confirm(
+                `⏰ Bây giờ là ${hour}h sáng.\n\n` +
+                `Bạn đang chấm công cho:\n\n` +
+                `[OK]     Ca đêm HÔM QUA (${yesterdayStr})\n` +
+                `[Cancel] Ca ngày HÔM NAY (${today})`
+            );
+            ts = choice ? yesterdayStr : today;
+        }
+    } else {
+        ts = todayStr();
+    }
+
+    if (getLogByDate(ts)) { showToast('Bạn đã chấm công ngày này!', 'warning'); return; }
     if (isAbsentDay(ts)) {
-        if (!confirm('Hôm nay bạn đã xác nhận nghỉ. Đổi thành đi làm?')) return;
+        if (!confirm('Ngày này đã xác nhận nghỉ. Đổi thành đi làm?')) return;
         unmarkAbsentDay(ts);
     }
+
     const s = getSuggestedShift();
-    const isSunday = new Date().getDay() === 0;
+    const isSunday = new Date(ts + 'T00:00:00').getDay() === 0;
     const r = calculateWorkLog(ts, s.shift, isSunday, s.startTime, s.endTime);
+
     workLogs.push({
         id: Date.now(), date: ts, shift: s.shift, isSunday,
         start: s.startTime, end: s.endTime,
@@ -446,14 +484,13 @@ function quickCheckIn() {
     saveWorkLogsToStorage();
     haptic(); playSound();
 
-    // ⭐ HIỆU ỨNG: confetti + checkmark
     if (window.Effects) {
         const btn = document.querySelector('.hero-actions .btn-confirm');
         if (btn) {
             const rect = btn.getBoundingClientRect();
             window.Effects.miniConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
         }
-        window.Effects.showCheckmark && window.Effects.showCheckmark();
+        if (window.Effects.showCheckmark) window.Effects.showCheckmark();
     }
 
     if (r.isPaidHoliday) showToast('🎉 Chấm công ngày lễ ' + r.holiday.name, 'success');
@@ -605,7 +642,6 @@ function loadDashboard() {
     el3.innerText = totalOT.toFixed(2);
     el4.innerText = currentSalary.toLocaleString('vi-VN') + ' đ';
 
-    // Hiệu ứng pulse khi update
     if (window.Effects) {
         window.Effects.pulse(el1);
         window.Effects.pulse(el4);
@@ -1652,7 +1688,6 @@ window.onload = function () {
 
     setupTopBarScroll();
 
-    // ⭐ Khởi tạo hiệu ứng
     setTimeout(() => {
         if (window.Effects) window.Effects.autoAttach();
     }, 100);
@@ -1669,80 +1704,127 @@ window.onload = function () {
     setInterval(checkReminder, 30 * 60 * 1000);
 };
 
-// ═══ CALCULATE ═══
+// ========================================================================
+// HÀM TÍNH LƯƠNG — CHUẨN QUY TẮC CÔNG TY
+// ========================================================================
 function calculateWorkLog(workDate, shift, isSunday, startTimeStr, endTimeStr) {
     const dailyRate = settings.baseSalary / settings.standardWorkDays;
     const hourlyRate = dailyRate / settings.standardShiftHours;
-    let regularHours = 0, overtimeHours = 0;
-    const start = startTimeStr, end = endTimeStr;
 
-    if (isSunday) {
-        regularHours = 0;
-        if (shift === 'Sáng') {
-            if (start === '07:30' && end === '16:00') overtimeHours = 8;
-            else if (start === '07:30' && end === '19:30') overtimeHours = 11.5;
-            else {
-                const s = new Date(`2000-01-01T${start}:00`);
-                let e = new Date(`2000-01-01T${end}:00`);
-                if (e < s) e = new Date(e.getTime() + 86400000);
-                let total = (e - s) / 3600000;
-                total = total > settings.breakHours ? total - settings.breakHours : 0;
-                overtimeHours = total;
-            }
-        } else {
-            if (start === '19:30' && end === '04:00') overtimeHours = 8;
-            else if (start === '19:30' && end === '07:30') overtimeHours = 11.75;
-            else {
-                const s = new Date(`2000-01-01T${start}:00`);
-                let e = new Date(`2000-01-01T${end}:00`);
-                if (e < s) e = new Date(e.getTime() + 86400000);
-                let total = (e - s) / 3600000;
-                total = total > settings.breakHours ? total - settings.breakHours : 0;
-                overtimeHours = total;
-            }
-        }
-    } else {
-        regularHours = 8;
-        if (shift === 'Sáng') {
-            if (start === '07:30' && end === '16:00') overtimeHours = 0;
-            else if (start === '07:30' && end === '19:30') overtimeHours = 3.5;
-            else {
-                const s = new Date(`2000-01-01T${start}:00`);
-                let e = new Date(`2000-01-01T${end}:00`);
-                if (e < s) e = new Date(e.getTime() + 86400000);
-                let total = (e - s) / 3600000;
-                total = total > settings.breakHours ? total - settings.breakHours : 0;
-                overtimeHours = total > 8 ? total - 8 : 0;
-                regularHours = Math.min(total, 8);
-            }
-        } else {
-            if (start === '19:30' && end === '04:00') overtimeHours = 0;
-            else if (start === '19:30' && end === '07:30') overtimeHours = 3.75;
-            else {
-                const s = new Date(`2000-01-01T${start}:00`);
-                let e = new Date(`2000-01-01T${end}:00`);
-                if (e < s) e = new Date(e.getTime() + 86400000);
-                let total = (e - s) / 3600000;
-                total = total > settings.breakHours ? total - settings.breakHours : 0;
-                overtimeHours = total > 8 ? total - 8 : 0;
-                regularHours = Math.min(total, 8);
-            }
-        }
+    // Parse giờ
+    const [sh, sm] = startTimeStr.split(':').map(Number);
+    const [eh, em] = endTimeStr.split(':').map(Number);
+
+    const startDate = new Date(2000, 0, 1, sh, sm, 0);
+    let endDate = new Date(2000, 0, 1, eh, em, 0);
+
+    // Nếu end <= start → qua ngày hôm sau
+    if (endDate <= startDate) {
+        endDate = new Date(endDate.getTime() + 24 * 60 * 60 * 1000);
     }
+
+    // Tổng giờ (bao gồm cả giờ nghỉ)
+    const totalHours = (endDate - startDate) / (1000 * 60 * 60);
+
+    // Giờ ra tính theo mốc 0h của ngày bắt đầu ca
+    const endHours = sh + sm / 60 + totalHours;
+
+    // ═══ KIỂM TRA CHỦ NHẬT / NGÀY LỄ ═══
+    const paidHoliday = HolidayResolver.getPaidHoliday(workDate);
+    const isSpecialDay = isSunday || !!paidHoliday;
+
+    let regularHours = 0;
+    let overtimeHours = 0;
+
+    // Mốc ra để được thưởng 0.5h
+    // Ca sáng: Ra >= 19:30 → 19.5
+    // Ca đêm:  Ra >= 07:30 hôm sau → 31.5
+    const bonusThreshold = shift === 'Sáng' ? 19.5 : 31.5;
+
+    if (isSpecialDay) {
+        // ═══════════════════════════════════════════
+        // CHỦ NHẬT / NGÀY LỄ: TẤT CẢ GIỜ LÀ TĂNG CA
+        // ═══════════════════════════════════════════
+        let workedHours = totalHours;
+
+        // Trừ nghỉ trưa (ca sáng) hoặc nghỉ đêm (ca đêm)
+        if (totalHours >= 8) {
+            workedHours -= 0.5;
+        } else if (totalHours >= 6) {
+            workedHours -= 0.25;
+        }
+
+        // Trừ nghỉ chiều (16:00-16:30) hoặc (04:00-04:30)
+        if (shift === 'Sáng' && endHours >= 16.5) {
+            workedHours -= 0.5;
+        } else if (shift === 'Đêm' && endHours >= 28.5) {
+            workedHours -= 0.5;
+        }
+
+        if (workedHours < 0) workedHours = 0;
+
+        regularHours = 0;
+        overtimeHours = workedHours;
+
+        // Thưởng 0.5h — chỉ khi ra >= mốc
+        if (endHours >= bonusThreshold) {
+            overtimeHours += 0.5;
+        }
+
+        // Phụ cấp ca đêm 0.25h
+        if (shift === 'Đêm' && overtimeHours > 0) {
+            overtimeHours += 0.25;
+        }
+
+    } else {
+        // ═══════════════════════════════════════════
+        // NGÀY THƯỜNG
+        // ═══════════════════════════════════════════
+        // 8h đầu = giờ thường
+        regularHours = Math.min(totalHours, 8);
+
+        // Mốc bắt đầu TC: sáng 16:30, đêm 04:30 hôm sau
+        const tcStartHours = shift === 'Sáng' ? 16.5 : 28.5;
+
+        let otHours = 0;
+        if (endHours > tcStartHours) {
+            otHours = endHours - tcStartHours;
+        }
+
+        if (otHours > 0) {
+            // Thưởng 0.5h — chỉ khi TC >= 3h
+            if (otHours >= 3) {
+                otHours += 0.5;
+            }
+
+            // Phụ cấp ca đêm 0.25h
+            if (shift === 'Đêm') {
+                otHours += 0.25;
+            }
+        }
+
+        overtimeHours = otHours;
+    }
+
+    // Làm tròn
     regularHours = Math.round(regularHours * 100) / 100;
     overtimeHours = Math.round(overtimeHours * 100) / 100;
 
+    // ═══ TÍNH LƯƠNG ═══
     const regularPay = regularHours * hourlyRate;
     let overtimePay = 0;
-    const paidHoliday = HolidayResolver.getPaidHoliday(workDate);
 
     if (overtimeHours > 0) {
         let coeff;
-        if (paidHoliday) coeff = settings.otHoliday;
-        else if (isSunday) coeff = shift === 'Sáng' ? settings.otSundayDay : settings.otSundayNight;
-        else coeff = shift === 'Sáng' ? settings.otNormalDay : settings.otNormalNight;
+        if (paidHoliday || isSunday) {
+            // Chủ nhật / Lễ: dùng hệ số Sunday
+            coeff = shift === 'Sáng' ? settings.otSundayDay : settings.otSundayNight;
+        } else {
+            coeff = shift === 'Sáng' ? settings.otNormalDay : settings.otNormalNight;
+        }
         overtimePay = overtimeHours * hourlyRate * coeff;
     }
+
     return {
         regularHours,
         overtimeHours,
