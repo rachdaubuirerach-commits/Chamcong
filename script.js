@@ -1,5 +1,5 @@
 // ========================================================================
-// TIMETRACKER v4.0 — Tính giờ theo quy tắc công ty
+// TIMETRACKER v4.0 — Tính giờ theo quy tắc công ty (FINAL)
 // ========================================================================
 
 const APP_VERSION = "4.0.0";
@@ -261,6 +261,9 @@ function todayStr() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
+function dateToStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 function getLogsByMonth(m, y) {
     const result = [];
     for (let i = 0; i < workLogs.length; i++) {
@@ -426,33 +429,42 @@ function getSuggestedShift() {
     return { shift, startTime, endTime };
 }
 
-// ═══ QUICK CHECK-IN — Thông minh ═══
+// ═══════════════════════════════════════════════════════════════
+//  QUICK CHECK-IN — FIXED (Xử lý đúng ca đêm qua ngày)
+// ═══════════════════════════════════════════════════════════════
 function quickCheckIn() {
     const now = new Date();
     const hour = now.getHours();
     const hasHistory = workLogs.length > 0;
 
-    let ts;
+    let ts = null;           // Ngày chấm công
+    let forceShift = null;   // Ca bắt buộc (nếu user chọn ca đêm)
 
-    // Xác định ngày chấm công
+    // ═══ XÁC ĐỊNH NGÀY VÀ CA ═══
     if (hour < 8) {
+        // Giờ 00:00-07:59 → có thể đang làm ca đêm qua ngày
+
         if (hasHistory) {
-            // Có lịch sử → dùng ca gợi ý
+            // Đã có lịch sử → dùng ca gợi ý
             const suggested = getSuggestedShift();
+
             if (suggested.shift === 'Đêm') {
+                // Lần trước làm ca đêm → tự động chấm cho ca đêm hôm qua
                 const yesterday = new Date(now);
                 yesterday.setDate(yesterday.getDate() - 1);
-                ts = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+                ts = dateToStr(yesterday);
+                forceShift = 'Đêm';
                 showToast(`⏰ Chấm cho ca đêm ngày ${ts}`, 'info');
             } else {
+                // Lần trước làm ca sáng → chấm cho hôm nay
                 ts = todayStr();
             }
         } else {
-            // Lần đầu → hỏi user
+            // Lần đầu chấm công → HỎI user
             const today = todayStr();
             const yesterday = new Date(now);
             yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+            const yesterdayStr = dateToStr(yesterday);
 
             const choice = confirm(
                 `⏰ Bây giờ là ${hour}h sáng.\n\n` +
@@ -460,30 +472,68 @@ function quickCheckIn() {
                 `[OK]     Ca đêm HÔM QUA (${yesterdayStr})\n` +
                 `[Cancel] Ca ngày HÔM NAY (${today})`
             );
-            ts = choice ? yesterdayStr : today;
+
+            if (choice) {
+                // Chọn ca đêm hôm qua
+                ts = yesterdayStr;
+                forceShift = 'Đêm';
+            } else {
+                // Chọn ca ngày hôm nay
+                ts = today;
+            }
         }
     } else {
+        // Giờ >= 8h → chấm cho hôm nay
         ts = todayStr();
     }
 
-    if (getLogByDate(ts)) { showToast('Bạn đã chấm công ngày này!', 'warning'); return; }
+    // ═══ KIỂM TRA ═══
+    if (getLogByDate(ts)) {
+        showToast('Bạn đã chấm công ngày này!', 'warning');
+        return;
+    }
     if (isAbsentDay(ts)) {
         if (!confirm('Ngày này đã xác nhận nghỉ. Đổi thành đi làm?')) return;
         unmarkAbsentDay(ts);
     }
 
-    const s = getSuggestedShift();
+    // ═══ XÁC ĐỊNH CA CHẤM ═══
+    const suggested = getSuggestedShift();
+    let shift, startTime, endTime;
+
+    if (forceShift === 'Đêm') {
+        // Bắt buộc ca đêm (từ lựa chọn của user)
+        shift = 'Đêm';
+        startTime = settings.nightStart || '19:30';
+        endTime = settings.nightEnd || '07:30';
+    } else {
+        // Dùng ca gợi ý
+        shift = suggested.shift;
+        startTime = suggested.startTime;
+        endTime = suggested.endTime;
+    }
+
+    // ═══ TÍNH TOÁN ═══
     const isSunday = new Date(ts + 'T00:00:00').getDay() === 0;
-    const r = calculateWorkLog(ts, s.shift, isSunday, s.startTime, s.endTime);
+    const r = calculateWorkLog(ts, shift, isSunday, startTime, endTime);
 
     workLogs.push({
-        id: Date.now(), date: ts, shift: s.shift, isSunday,
-        start: s.startTime, end: s.endTime,
-        regularHours: r.regularHours, overtimeHours: r.overtimeHours, totalPay: r.totalPay
+        id: Date.now(),
+        date: ts,
+        shift: shift,
+        isSunday,
+        start: startTime,
+        end: endTime,
+        regularHours: r.regularHours,
+        overtimeHours: r.overtimeHours,
+        totalPay: r.totalPay
     });
-    saveWorkLogsToStorage();
-    haptic(); playSound();
 
+    saveWorkLogsToStorage();
+    haptic();
+    playSound();
+
+    // ⭐ HIỆU ỨNG
     if (window.Effects) {
         const btn = document.querySelector('.hero-actions .btn-confirm');
         if (btn) {
@@ -494,7 +544,7 @@ function quickCheckIn() {
     }
 
     if (r.isPaidHoliday) showToast('🎉 Chấm công ngày lễ ' + r.holiday.name, 'success');
-    else showToast('✅ Chấm công thành công!', 'success');
+    else showToast(`✅ Đã chấm ca ${shift} ngày ${ts}`, 'success');
 
     loadDashboard();
     if (!document.getElementById('page-worklog').classList.contains('hidden')) applyWorklogMonthFilter();
@@ -738,7 +788,7 @@ function renderAchievements() {
     const today = new Date(); today.setHours(0,0,0,0);
     let check = new Date(today);
     for (let i = 0; i < 365; i++) {
-        const ds = `${check.getFullYear()}-${String(check.getMonth()+1).padStart(2,'0')}-${String(check.getDate()).padStart(2,'0')}`;
+        const ds = dateToStr(check);
         if (workLogs.some(l => l.date === ds)) { streak++; check.setDate(check.getDate() - 1); }
         else if (i === 0 && isAbsentDay(ds)) { check.setDate(check.getDate() - 1); }
         else break;
