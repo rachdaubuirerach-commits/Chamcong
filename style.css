@@ -1,5 +1,6 @@
 /* ========================================================================
-   TIMETRACKER v3.3 — CSS chính (ĐỎ LỒNG ĐÈN 🏮)
+   TIMETRACKER v3.4 — CSS chính
+   Font Be Vietnam Pro + Icon line-art Trung Thu 🏮
    ======================================================================== */
 
 :root {
@@ -49,35 +50,79 @@
     --gray-600: #D9A8A8; --gray-700: #F0C8C8; --gray-800: #FFE0E0; --gray-900: #FFF4E6;
 }
 
+/* ═══════════════ RESET + FONT TIẾNG VIỆT ═══════════════ */
 * {
     margin: 0; padding: 0; box-sizing: border-box;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', 'SF Pro Display', sans-serif;
+    font-family:
+        'Be Vietnam Pro',
+        'Inter',
+        -apple-system, BlinkMacSystemFont,
+        'Segoe UI', Roboto, 'Helvetica Neue',
+        'Noto Sans', 'Noto Sans Vietnamese',
+        Arial, sans-serif;
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+    text-rendering: optimizeLegibility;
 }
 
 html { scroll-behavior: smooth; background: var(--bg); }
 body {
     background: var(--bg); min-height: 100vh; padding-bottom: 110px;
     color: var(--gray-800); font-size: var(--text-base); line-height: 1.5;
-    overflow-x: hidden; text-rendering: optimizeSpeed; overscroll-behavior-y: none;
+    overflow-x: hidden; overscroll-behavior-y: none;
     transition: background-color 200ms;
 }
+
+/* ═══════════════ NỀN: MÂY + TRĂNG + TRỐNG ĐỒNG ═══════════════ */
 body::before {
     content: ""; position: fixed; inset: 0; z-index: -1;
     background:
-        radial-gradient(ellipse at top left, rgba(217,43,43,0.10), transparent 55%),
-        radial-gradient(ellipse at bottom right, rgba(245,197,66,0.12), transparent 55%),
-        radial-gradient(circle at 50% 100%, rgba(255,140,66,0.08), transparent 60%);
+        radial-gradient(circle at 92% 8%, rgba(255,217,102,0.35) 0%, rgba(255,217,102,0.08) 8%, transparent 18%),
+        radial-gradient(ellipse 40% 8% at 20% 15%, rgba(255,255,255,0.35), transparent 60%),
+        radial-gradient(ellipse 30% 6% at 75% 22%, rgba(255,255,255,0.28), transparent 60%),
+        radial-gradient(ellipse 35% 7% at 45% 35%, rgba(255,255,255,0.22), transparent 60%),
+        radial-gradient(circle at 50% 50%, transparent 28%, rgba(217,43,43,0.045) 28.5%, rgba(217,43,43,0.045) 30%, transparent 30.5%),
+        radial-gradient(circle at 50% 50%, transparent 18%, rgba(245,197,66,0.05) 18.5%, rgba(245,197,66,0.05) 20%, transparent 20.5%),
+        radial-gradient(ellipse at top left, rgba(217,43,43,0.12), transparent 55%),
+        radial-gradient(ellipse at bottom right, rgba(245,197,66,0.15), transparent 55%),
+        radial-gradient(circle at 50% 100%, rgba(255,140,66,0.10), transparent 60%);
     pointer-events: none;
 }
 [data-theme="dark"] body::before {
     background:
-        radial-gradient(ellipse at top left, rgba(217,43,43,0.24), transparent 55%),
-        radial-gradient(ellipse at bottom right, rgba(245,197,66,0.18), transparent 55%),
-        radial-gradient(circle at 50% 100%, rgba(255,140,66,0.14), transparent 60%);
+        radial-gradient(circle at 92% 8%, rgba(255,240,180,0.55) 0%, rgba(255,240,180,0.15) 8%, transparent 20%),
+        radial-gradient(ellipse 40% 8% at 20% 15%, rgba(245,197,66,0.10), transparent 60%),
+        radial-gradient(ellipse 30% 6% at 75% 22%, rgba(245,197,66,0.08), transparent 60%),
+        radial-gradient(circle at 50% 50%, transparent 28%, rgba(245,197,66,0.06) 28.5%, rgba(245,197,66,0.06) 30%, transparent 30.5%),
+        radial-gradient(circle at 50% 50%, transparent 18%, rgba(217,43,43,0.08) 18.5%, rgba(217,43,43,0.08) 20%, transparent 20.5%),
+        radial-gradient(ellipse at top left, rgba(217,43,43,0.28), transparent 55%),
+        radial-gradient(ellipse at bottom right, rgba(245,197,66,0.20), transparent 55%),
+        radial-gradient(circle at 50% 100%, rgba(255,140,66,0.15), transparent 60%);
 }
+
+/* ═══════════════ SVG LINE-ART BASE ═══════════════ */
+.card-header .icon svg,
+.stat-icon svg,
+.bottom-nav .nav-item svg,
+.fab svg,
+.icon-btn svg,
+.btn svg,
+.toast svg,
+.pin-icon svg,
+.pin-pad svg,
+.reminder-icon svg {
+    fill: none;
+    stroke: currentColor;
+    vector-effect: non-scaling-stroke;
+    shape-rendering: geometricPrecision;
+}
+.fab svg { stroke-width: 2; }
+.btn svg, .icon-btn svg { flex-shrink: 0; }
+.card-header .icon svg { width: 18px; height: 18px; }
+.stat-icon svg { width: 20px; height: 20px; }
+.bottom-nav .nav-item svg { width: 22px; height: 22px; }
 
 /* ═══════════════ TỐI ƯU ═══════════════ */
 .card, .btn, .nav-item, .cal-cell, .lunar-cell-view,
@@ -142,9 +187,10 @@ body::before {
     color: var(--gray-900); letter-spacing: -0.8px;
 }
 .splash-title span {
-    background: var(--primary-gradient);
+    background: linear-gradient(135deg, #D92B2B 0%, #FF8C42 50%, #F5C542 100%);
     -webkit-background-clip: text; background-clip: text;
     -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 24px rgba(245,197,66,0.4);
 }
 .splash-sub { font-size: var(--text-base); color: var(--gray-500); margin-top: var(--sp-1); font-weight: 500; }
 .splash-loader {
@@ -185,6 +231,7 @@ body::before {
     color: white; margin-bottom: var(--sp-3);
     box-shadow: 0 6px 20px var(--primary-glow);
 }
+.pin-icon svg { stroke: #fff; }
 .pin-box h2 { font-size: var(--text-lg); font-weight: 800; color: var(--gray-900); margin-bottom: var(--sp-1); }
 .pin-hint { font-size: var(--text-sm); color: var(--gray-500); margin-bottom: var(--sp-5); }
 .pin-dots { display: flex; gap: var(--sp-3); justify-content: center; margin-bottom: var(--sp-5); }
@@ -283,6 +330,14 @@ body::before {
     display: flex; justify-content: space-between; align-items: center; gap: var(--sp-2);
     transition: box-shadow 0.28s var(--ease-out), background 0.28s var(--ease-out);
 }
+.top-bar::after {
+    content: "";
+    position: absolute; inset: 4px;
+    border-radius: calc(var(--r-lg) - 4px);
+    border: 1px dashed rgba(245,197,66,0.35);
+    pointer-events: none;
+    opacity: 0.7;
+}
 [data-theme="dark"] .top-bar {
     background: linear-gradient(135deg, rgba(42,14,14,0.94), rgba(31,10,10,0.94));
     box-shadow: 0 8px 28px rgba(0,0,0,0.5), 0 2px 6px rgba(245,197,66,0.2);
@@ -304,6 +359,20 @@ body::before {
     flex-shrink: 0;
     transition: transform 0.3s var(--ease-spring);
     position: relative;
+    color: #fff;
+}
+.brand-icon::before {
+    content: "";
+    position: absolute; inset: -8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(245,197,66,0.35) 0%, transparent 70%);
+    animation: brandGlow 2.6s ease-in-out infinite;
+    pointer-events: none;
+    z-index: -1;
+}
+@keyframes brandGlow {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.3); opacity: 1; }
 }
 .brand-icon::after {
     content: "";
@@ -348,7 +417,6 @@ body::before {
 .icon-btn:active { transform: scale(0.92); }
 .icon-btn:active svg { animation: iconRotate 0.5s ease-out; }
 @keyframes iconRotate { to { transform: rotate(360deg); } }
-.icon-btn svg { stroke: currentColor; }
 #theme-toggle:active svg { animation: themeFlip 0.6s ease-out; }
 @keyframes themeFlip {
     0% { transform: rotate(0deg) scale(1); }
@@ -405,6 +473,30 @@ body::before {
     opacity: 0.75;
     pointer-events: none;
 }
+.card::after {
+    content: "";
+    position: absolute;
+    bottom: 8px; right: 8px;
+    width: 26px; height: 26px;
+    background-image:
+        radial-gradient(circle, rgba(217,43,43,0.28) 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(217,43,43,0.28) 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(217,43,43,0.28) 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(217,43,43,0.28) 1px, transparent 1.5px);
+    background-size: 8px 8px;
+    background-position: 0 0, 8px 0, 0 8px, 8px 8px;
+    background-repeat: no-repeat;
+    opacity: 0.35;
+    pointer-events: none;
+    border-radius: 4px;
+}
+[data-theme="dark"] .card::after {
+    background-image:
+        radial-gradient(circle, rgba(245,197,66,0.35) 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(245,197,66,0.35) 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(245,197,66,0.35) 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(245,197,66,0.35) 1px, transparent 1.5px);
+}
 @media (hover: hover) {
     .card:hover {
         transform: translateY(-3px);
@@ -417,6 +509,11 @@ body::before {
     color: var(--gray-800); margin-bottom: var(--sp-4);
     display: flex; align-items: center; gap: var(--sp-3);
     letter-spacing: -0.1px;
+    padding-bottom: var(--sp-2);
+    border-bottom: 1px dashed rgba(245,197,66,0.3);
+}
+[data-theme="dark"] .card-header {
+    border-bottom-color: rgba(245,197,66,0.25);
 }
 .card-header .icon {
     display: flex; align-items: center; justify-content: center;
@@ -424,11 +521,15 @@ body::before {
     background: var(--primary-gradient);
     color: #fff; flex-shrink: 0;
     box-shadow: 0 4px 14px var(--primary-glow);
-    font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Segoe UI Symbol","Android Emoji",sans-serif;
-    font-variant-emoji: emoji;
-    font-size: 16px; line-height: 1;
+    position: relative;
 }
-.card-header .icon svg { stroke: #fff; }
+.card-header .icon::after {
+    content: "";
+    position: absolute; inset: -2px;
+    border-radius: inherit;
+    border: 1px solid rgba(245,197,66,0.5);
+    pointer-events: none;
+}
 
 /* ═══════════════ HERO ═══════════════ */
 .hero-card {
@@ -451,6 +552,24 @@ body::before {
     font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Segoe UI Symbol",sans-serif;
     font-variant-emoji: emoji;
 }
+.hero-card::after {
+    content: "";
+    position: absolute; top: -30px; right: -30px;
+    width: 140px; height: 140px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+        rgba(255,240,180,0.55) 0%,
+        rgba(255,217,102,0.30) 25%,
+        rgba(245,197,66,0.12) 45%,
+        transparent 70%);
+    pointer-events: none;
+    animation: moonGlow 5s ease-in-out infinite;
+    z-index: 0;
+}
+@keyframes moonGlow {
+    0%, 100% { transform: scale(1); opacity: 0.85; }
+    50% { transform: scale(1.12); opacity: 1; }
+}
 .hero-card-bg {
     position: absolute; top: -50%; right: -30%;
     width: 60%; height: 200%;
@@ -462,6 +581,21 @@ body::before {
     width: 180px; height: 180px;
     background: radial-gradient(circle, rgba(245,197,66,0.55), transparent 70%);
     border-radius: 50%; filter: blur(30px); pointer-events: none;
+}
+.hero-card-glow::after {
+    content: "🏮";
+    position: absolute;
+    bottom: -6px; left: 12px;
+    font-size: 26px;
+    filter: drop-shadow(0 0 12px rgba(245,197,66,0.8));
+    font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
+    font-variant-emoji: emoji;
+    animation: miniLanternSwing 3.5s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes miniLanternSwing {
+    0%, 100% { transform: rotate(-8deg) translateY(0); }
+    50% { transform: rotate(8deg) translateY(2px); }
 }
 .hero-card-content { padding: var(--sp-4) var(--sp-5) var(--sp-5); position: relative; z-index: 1; }
 .hero-top {
@@ -655,16 +789,13 @@ body::before {
     }
 }
 .stat-icon {
-    font-size: 20px; width: 42px; height: 42px; border-radius: var(--r-md);
+    width: 42px; height: 42px; border-radius: var(--r-md);
     display: flex; align-items: center; justify-content: center;
     background: var(--primary-gradient);
     color: #fff; flex-shrink: 0;
     transition: transform 0.4s var(--ease-spring);
     box-shadow: 0 4px 12px var(--primary-glow);
-    font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Segoe UI Symbol","Android Emoji",sans-serif;
-    font-variant-emoji: emoji;
 }
-.stat-icon svg { stroke: #fff; }
 .stat-card.green .stat-icon {
     background: linear-gradient(135deg, #10B981, #34D399);
     box-shadow: 0 4px 12px rgba(16,185,129,0.4);
@@ -672,8 +803,8 @@ body::before {
 .stat-card.yellow .stat-icon {
     background: var(--lantern-gold-grad);
     box-shadow: 0 4px 12px rgba(245,197,66,0.5);
+    color: #7A1010;
 }
-.stat-card.yellow .stat-icon svg { stroke: #7A1010; }
 .stat-card.blue .stat-icon {
     background: linear-gradient(135deg, #FF8C42, #D92B2B);
     box-shadow: 0 4px 12px rgba(255,140,66,0.4);
@@ -696,7 +827,12 @@ body::before {
     100% { transform: scale(1); }
 }
 .stat-card.green .stat-value { color: var(--success); }
-.stat-card.yellow .stat-value { color: var(--lantern-gold-dark); }
+.stat-card.yellow .stat-value {
+    background: linear-gradient(135deg, #C9A227 0%, #F5C542 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 12px rgba(245,197,66,0.3);
+}
 .stat-card.blue .stat-value { color: var(--primary); }
 [data-theme="dark"] .stat-value { color: var(--lantern-gold); }
 [data-theme="dark"] .stat-card.green .stat-value { color: #34D399; }
@@ -800,6 +936,14 @@ body::before {
 .btn:active::after { background: rgba(255,255,255,0.2); }
 .btn:active { transform: scale(0.96); }
 .btn-primary { background: var(--primary-gradient); color: white; box-shadow: 0 6px 20px var(--primary-glow), inset 0 1px 0 rgba(255,217,102,0.3); }
+.btn-primary::after {
+    content: "";
+    position: absolute; inset: 3px;
+    border-radius: calc(var(--r-md) - 3px);
+    border: 1px solid rgba(245,197,66,0.35);
+    background: none;
+    pointer-events: none;
+}
 .btn-primary:active { animation: btnGlow 0.4s ease-out; }
 @keyframes btnGlow {
     0% { box-shadow: 0 0 0 0 currentColor; }
@@ -1278,7 +1422,7 @@ tr:last-child td { border-bottom: none; }
     bottom: 96px; right: var(--sp-5);
     width: 58px; height: 58px; border-radius: 50%;
     border: 1.5px solid rgba(245,197,66,0.5);
-    background: var(--primary-gradient);
+    background: linear-gradient(135deg, #D92B2B 0%, #F5C542 100%);
     color: white;
     cursor: pointer;
     box-shadow: 0 12px 36px var(--primary-glow), 0 6px 18px rgba(0,0,0,0.15),
@@ -1297,7 +1441,6 @@ tr:last-child td { border-bottom: none; }
     50% { transform: scale(0.85) rotate(-20deg); }
     100% { transform: scale(0.85) rotate(15deg); }
 }
-.fab svg { fill: currentColor; transition: transform 0.3s; }
 .fab:active svg { animation: fabIconSpin 0.5s ease-out; }
 @keyframes fabIconSpin {
     0% { transform: rotate(0deg) scale(1); }
@@ -1335,6 +1478,21 @@ tr:last-child td { border-bottom: none; }
     padding: 6px;
     box-shadow: 0 16px 44px rgba(217,43,43,0.18), 0 4px 12px rgba(245,197,66,0.15);
     padding-bottom: calc(6px + env(safe-area-inset-bottom));
+}
+.bottom-nav::before {
+    content: "";
+    position: absolute;
+    top: 6px; left: 50%;
+    transform: translateX(-50%);
+    width: 60px; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--lantern-gold), transparent);
+    border-radius: 2px;
+    pointer-events: none;
+    animation: navGoldPulse 3s ease-in-out infinite;
+}
+@keyframes navGoldPulse {
+    0%, 100% { opacity: 0.5; width: 60px; }
+    50% { opacity: 1; width: 90px; }
 }
 [data-theme="dark"] .bottom-nav {
     background: linear-gradient(135deg, rgba(42,14,14,0.96), rgba(31,10,10,0.96));
@@ -1522,7 +1680,9 @@ html.theme-changing * {
     .ripple-effect { display: none; }
     .progress-fill, .ach-item::after, .cal-note-dot,
     .hero-status-dot, .reminder-icon,
-    .lantern-hang, .brand-icon::after { animation: none; }
+    .lantern-hang, .brand-icon::before, .brand-icon::after,
+    .hero-card::after, .hero-card-glow::after,
+    .bottom-nav::before { animation: none; }
 }
 
 /* ═══════════════ PRINT ═══════════════ */
@@ -1535,95 +1695,8 @@ html.theme-changing * {
 }
 
 /* ========================================================================
-   🏮 ICON ĐA NỀN TẢNG — SVG → EMOJI
-   ======================================================================== */
-
-.card-header .icon svg,
-.stat-icon svg,
-.bottom-nav .nav-item svg,
-.fab svg,
-#theme-toggle svg,
-#lang-toggle svg { display: none !important; }
-
-.card-header .icon,
-.stat-icon,
-.bottom-nav .nav-item,
-.fab,
-#theme-toggle,
-#lang-toggle {
-    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji",
-                 "Segoe UI Symbol", "Android Emoji", "EmojiSymbols", sans-serif;
-    font-variant-emoji: emoji;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
-}
-
-/* Card header icons */
-.card-header .icon::before { content: "🏮"; font-size: 16px; line-height: 1; display: inline-block; }
-.card-header .icon:has(use[href*="i-calendar"])::before   { content: "📅"; }
-.card-header .icon:has(use[href*="i-clock"])::before      { content: "⏰"; }
-.card-header .icon:has(use[href*="i-trending"])::before   { content: "📈"; }
-.card-header .icon:has(use[href*="i-wallet"])::before     { content: "💰"; }
-.card-header .icon:has(use[href*="i-target"])::before     { content: "🎯"; }
-.card-header .icon:has(use[href*="i-rocket"])::before     { content: "🚀"; }
-.card-header .icon:has(use[href*="i-info"])::before       { content: "ℹ️"; }
-.card-header .icon:has(use[href*="i-trophy"])::before     { content: "🏆"; }
-.card-header .icon:has(use[href*="i-file-text"])::before  { content: "📄"; }
-.card-header .icon:has(use[href*="i-chart"])::before      { content: "📊"; }
-.card-header .icon:has(use[href*="i-pie"])::before        { content: "🥧"; }
-.card-header .icon:has(use[href*="i-users"])::before      { content: "👥"; }
-.card-header .icon:has(use[href*="i-palette"])::before    { content: "🎨"; }
-.card-header .icon:has(use[href*="i-shield"])::before     { content: "🛡️"; }
-.card-header .icon:has(use[href*="i-database"])::before   { content: "🗄️"; }
-.card-header .icon:has(use[href*="i-trash"])::before      { content: "🗑️"; }
-
-/* Stat icons */
-.stat-icon::before { content: "🏮"; font-size: 20px; line-height: 1; }
-.stat-icon:has(use[href*="i-calendar"])::before { content: "📅"; }
-.stat-icon:has(use[href*="i-clock"])::before    { content: "⏰"; }
-.stat-icon:has(use[href*="i-trending"])::before { content: "📈"; }
-.stat-icon:has(use[href*="i-wallet"])::before   { content: "💰"; }
-
-/* Bottom nav icons */
-.bottom-nav .nav-item::before {
-    content: "🏮"; font-size: 22px; line-height: 1;
-    display: inline-block;
-    transition: transform 0.3s var(--ease-spring);
-}
-.bottom-nav .nav-item[data-page="dashboard"]::before  { content: "🏠"; }
-.bottom-nav .nav-item[data-page="calendar"]::before   { content: "📅"; }
-.bottom-nav .nav-item[data-page="worklog"]::before    { content: "✏️"; }
-.bottom-nav .nav-item[data-page="statistics"]::before { content: "📊"; }
-.bottom-nav .nav-item[data-page="settings"]::before   { content: "⚙️"; }
-.bottom-nav .nav-item.active::before { animation: navBounce 0.5s var(--ease-spring); }
-
-/* FAB → ⚡ */
-.fab::after {
-    content: "⚡"; font-size: 26px; line-height: 1;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
-}
-
-/* Theme toggle → ☀️/🌙 */
-#theme-toggle::before { content: "🌓"; font-size: 18px; line-height: 1; }
-[data-theme="light"] #theme-toggle::before { content: "☀️"; }
-[data-theme="dark"]  #theme-toggle::before { content: "🌙"; }
-
-/* Lang toggle → 🌐 */
-#lang-toggle::before { content: "🌐"; font-size: 18px; line-height: 1; }
-
-/* Fallback cho trình duyệt không hỗ trợ :has() */
-@supports not selector(:has(*)) {
-    .card-header .icon::before,
-    .stat-icon::before { content: "🏮"; }
-}
-
-/* ========================================================================
    🏮 LỒNG ĐÈN TREO 2 GÓC MÀN HÌNH
-   Cần thêm vào index.html sau <body>:
-   <div class="lantern-hang left"><span class="lantern-body"></span><span class="lantern-tassel"></span></div>
-   <div class="lantern-hang right"><span class="lantern-body"></span><span class="lantern-tassel"></span></div>
    ======================================================================== */
-
 .lantern-hang {
     position: fixed; top: -10px;
     pointer-events: none; z-index: 99;
@@ -1647,7 +1720,7 @@ html.theme-changing * {
 .lantern-hang .lantern-body {
     position: relative; display: block;
     width: 52px; height: 60px;
-    margin-top: 40px; font-size: 52px; line-height: 1;
+    margin-top: 40px;
     font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",
                  "Segoe UI Symbol","Android Emoji",sans-serif;
     font-variant-emoji: emoji;
@@ -1657,6 +1730,8 @@ html.theme-changing * {
 .lantern-hang .lantern-body::before {
     content: "🏮";
     display: block;
+    font-size: 52px;
+    line-height: 1;
     transform: translateY(-4px);
 }
 .lantern-hang .lantern-body::after {
