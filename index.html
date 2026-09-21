@@ -3,335 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#D92B2B">
+    <meta name="theme-color" content="#4F46E5">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="manifest" href="manifest.json">
     <title>TimeTracker v3.3</title>
 
-    <!-- Preconnect CDN + Google Fonts -->
+    <!-- Preconnect CDN để tải nhanh hơn -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="style.css?v=4">
-    <link rel="stylesheet" href="style-effects.css?v=4">
+    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style-effects.css?v=2">
 </head>
 <body>
 
-<!--  LNG �N TREO 2 G�C � TRUNG THU   -->
-<div class="lantern-hang left" aria-hidden="true">
-    <span class="lantern-body"></span>
-    <span class="lantern-tassel"></span>
-</div>
-<div class="lantern-hang right" aria-hidden="true">
-    <span class="lantern-body"></span>
-    <span class="lantern-tassel"></span>
-</div>
-
-<!-- 
-     B ICON SVG LINE-ART � CHT TRUNG THU 
-      -->
 <svg style="display:none" xmlns="http://www.w3.org/2000/svg">
-
-    <!--  ICON TRUNG THU C TRNG  -->
-
-    <!-- �n lng (logo/app icon) -->
-    <symbol id="i-lantern" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M9 3h6"/>
-        <path d="M10 3v2M14 3v2"/>
-        <path d="M7 6h10l-1 12H8L7 6z"/>
-        <path d="M9 6c0 2 1.5 3 3 3s3-1 3-3"/>
-        <path d="M10 18v2M14 18v2"/>
-        <path d="M10 20h4"/>
-        <path d="M12 20v2"/>
-    </symbol>
-
-    <!-- Trng tr�n + m�y (dashboard/today) -->
-    <symbol id="i-moon-lantern" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="11" r="6"/>
-        <path d="M12 5v1M12 16v1M6 11h1M17 11h1M7.8 6.8l.7.7M15.5 14.5l.7.7M7.8 15.2l.7-.7M15.5 7.5l.7-.7"/>
-        <path d="M3 20h18"/>
-        <path d="M5 17.5c1-.5 2 .5 3 0s2 .5 3 0 2 .5 3 0 2 .5 3 0 2 .5 3 0"/>
-    </symbol>
-
-    <!-- B�nh trung thu (achievement) -->
-    <symbol id="i-mooncake" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="4" y="6" width="16" height="12" rx="2"/>
-        <path d="M4 9h16M4 15h16"/>
-        <circle cx="12" cy="12" r="2.5"/>
-        <path d="M12 9.5v5M9.5 12h5"/>
-        <path d="M7 6V5M17 6V5M7 19v-1M17 19v-1"/>
-    </symbol>
-
-    <!-- Hoa ng (achievement) -->
-    <symbol id="i-flower-lantern" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 3c-1.5 0-2.5 1-2.5 2.5S10.5 8 12 8s2.5-1 2.5-2.5S13.5 3 12 3z"/>
-        <path d="M12 8v3"/>
-        <path d="M6 11h12l-1.5 6h-9L6 11z"/>
-        <path d="M9 17v2M15 17v2"/>
-        <path d="M10 19h4"/>
-    </symbol>
-
-    <!-- Th ngc (night shift / achievement) -->
-    <symbol id="i-jade-rabbit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M9 4c0 2 0 4 1 5"/>
-        <path d="M15 4c0 2 0 4-1 5"/>
-        <circle cx="12" cy="13" r="5"/>
-        <circle cx="10" cy="12" r=".5" fill="currentColor" stroke="none"/>
-        <circle cx="14" cy="12" r=".5" fill="currentColor" stroke="none"/>
-        <path d="M12 14v1"/>
-        <path d="M11 16c.5.5 1.5.5 2 0"/>
-        <path d="M7 13H5M17 13h2"/>
-    </symbol>
-
-    <!--  ICON CHC NNG  -->
-
-    <!-- Check circle (� chm c�ng) -->
-    <symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="9"/>
-        <path d="m8.5 12 2.5 2.5L16 9"/>
-    </symbol>
-
-    <!-- Lch (c� trng nh g�c) -->
-    <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="5" width="18" height="16" rx="2"/>
-        <path d="M3 10h18"/>
-        <path d="M8 3v4M16 3v4"/>
-        <circle cx="16.5" cy="15.5" r="1.5"/>
-        <path d="M15 15.5h.01"/>
-    </symbol>
-
-    <!-- ng h -->
-    <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="9"/>
-        <path d="M12 7v5l3 2"/>
-    </symbol>
-
-    <!-- Trending -->
-    <symbol id="i-trending" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 17l5-5 4 4 8-9"/>
-        <path d="M15 7h5v5"/>
-    </symbol>
-
-    <!-- V� tin -->
-    <symbol id="i-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1"/>
-        <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7H5"/>
-        <circle cx="17" cy="13" r="1" fill="currentColor" stroke="none"/>
-    </symbol>
-
-    <!-- Mc ti�u -->
-    <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="9"/>
-        <circle cx="12" cy="12" r="5"/>
-        <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>
-    </symbol>
-
-    <!-- Rocket -->
-    <symbol id="i-rocket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 3c3 0 6 3 6 7v3l-3 3h-6l-3-3v-3c0-4 3-7 6-7z"/>
-        <circle cx="12" cy="10" r="2"/>
-        <path d="M9 16l-2 5 3-2M15 16l2 5-3-2"/>
-    </symbol>
-
-    <!-- Info -->
-    <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="9"/>
-        <path d="M12 11v5"/>
-        <circle cx="12" cy="8" r=".5" fill="currentColor" stroke="none"/>
-    </symbol>
-
-    <!-- Trophy / C�p c� ng�i sao -->
-    <symbol id="i-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/>
-        <path d="M8 5H5v2a3 3 0 0 0 3 3M16 5h3v2a3 3 0 0 1-3 3"/>
-        <path d="M12 13v4"/>
-        <path d="M8 20h8"/>
-        <path d="M9 20v-3h6v3"/>
-        <path d="m12 7 0.6 1.2 1.4 0.2-1 1 0.25 1.4L12 10l-1.25 0.8L11 9.4l-1-1 1.4-0.2z"/>
-    </symbol>
-
-    <!-- Edit -->
-    <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 20h4l11-11-4-4L4 16v4z"/>
-        <path d="M14 6l4 4"/>
-    </symbol>
-
-    <!-- Save -->
-    <symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M5 3h11l3 3v15H5z"/>
-        <path d="M8 3v6h7V3"/>
-        <circle cx="12" cy="15" r="2"/>
-    </symbol>
-
-    <!-- Trash -->
-    <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 6h16"/>
-        <path d="M9 6V4h6v2"/>
-        <path d="M6 6l1 14h10l1-14"/>
-        <path d="M10 11v6M14 11v6"/>
-    </symbol>
-
-    <!-- X / Close -->
-    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M6 6l12 12M18 6L6 18"/>
-    </symbol>
-
-    <!-- Plus -->
-    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 5v14M5 12h14"/>
-    </symbol>
-
-    <!-- Refresh -->
-    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M20 11a8 8 0 0 0-14-5l-2 2"/>
-        <path d="M4 5v4h4"/>
-        <path d="M4 13a8 8 0 0 0 14 5l2-2"/>
-        <path d="M20 19v-4h-4"/>
-    </symbol>
-
-    <!-- Download -->
-    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 3v12"/>
-        <path d="m7 10 5 5 5-5"/>
-        <path d="M4 19h16"/>
-    </symbol>
-
-    <!-- Upload -->
-    <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 15V3"/>
-        <path d="m7 8 5-5 5 5"/>
-        <path d="M4 19h16"/>
-    </symbol>
-
-    <!-- Settings / B�nh rng c� c�nh -->
-    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
-        <path d="M7 4.5 8 3M17 4.5 16 3M19.5 7 21 8M19.5 17 21 16M7 19.5 8 21M17 19.5 16 21M4.5 7 3 8M4.5 17 3 16"/>
-    </symbol>
-
-    <!-- Users -->
-    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="9" cy="8" r="3"/>
-        <path d="M3 20c0-3 3-5 6-5s6 2 6 5"/>
-        <path d="M16 6a3 3 0 0 1 0 6M21 20c0-2-1.5-3.5-3-4"/>
-    </symbol>
-
-    <!-- Palette -->
-    <symbol id="i-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 3a9 9 0 1 0 0 18c1 0 1.5-.5 1.5-1.5 0-.5-.5-1-.5-1.5s.5-1 1-1h2a4 4 0 0 0 4-4c0-5-4-10-8-10z"/>
-        <circle cx="7.5" cy="10.5" r=".5" fill="currentColor" stroke="none"/>
-        <circle cx="12" cy="7.5" r=".5" fill="currentColor" stroke="none"/>
-        <circle cx="16.5" cy="10.5" r=".5" fill="currentColor" stroke="none"/>
-    </symbol>
-
-    <!-- Lock -->
-    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="5" y="11" width="14" height="10" rx="2"/>
-        <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
-        <circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/>
-    </symbol>
-
-    <!-- Shield -->
-    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 3l8 3v5c0 5-3 8-8 10-5-2-8-5-8-10V6l8-3z"/>
-        <path d="m9 12 2 2 4-4"/>
-    </symbol>
-
-    <!-- Database -->
-    <symbol id="i-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <ellipse cx="12" cy="6" rx="8" ry="3"/>
-        <path d="M4 6v6c0 1.5 3.5 3 8 3s8-1.5 8-3V6"/>
-        <path d="M4 12v6c0 1.5 3.5 3 8 3s8-1.5 8-3v-6"/>
-    </symbol>
-
-    <!-- Chart bars -->
-    <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>
-    </symbol>
-
-    <!-- Pie chart -->
-    <symbol id="i-pie" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 3v9h9a9 9 0 1 1-9-9z"/>
-    </symbol>
-
-    <!-- File text -->
-    <symbol id="i-file-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M6 3h8l4 4v14H6z"/>
-        <path d="M14 3v4h4"/>
-        <path d="M9 12h6M9 15h6M9 18h4"/>
-    </symbol>
-
-    <!-- Sun -->
-    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="4"/>
-        <path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5"/>
-    </symbol>
-
-    <!-- Moon -->
-    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10z"/>
-    </symbol>
-
-    <!-- Globe -->
-    <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="9"/>
-        <path d="M3 12h18"/>
-        <path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/>
-    </symbol>
-
-    <!-- Bell (chu�ng c� n) -->
-    <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M6 16V10a6 6 0 0 1 12 0v6l1 2H5l1-2z"/>
-        <path d="M10 20a2 2 0 0 0 4 0"/>
-        <path d="M12 4V2"/>
-        <circle cx="12" cy="3" r="0.8"/>
-        <path d="M9 10h6M9 13h6"/>
-    </symbol>
-
-    <!-- Home (cng nh� + �n lng nh) -->
-    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 11l9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9z"/>
-        <path d="M9 22V14h6v8"/>
-        <path d="M12 9v2"/>
-        <circle cx="12" cy="12" r="1.5"/>
-    </symbol>
-
-    <!-- Zap / S�t (FAB) -->
-    <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/>
-    </symbol>
-
-    <!-- Chevron left -->
-    <symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="m15 6-6 6 6 6"/>
-    </symbol>
-
-    <!-- Chevron right -->
-    <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="m9 6 6 6-6 6"/>
-    </symbol>
-
-    <!-- Map pin -->
-    <symbol id="i-map-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 22s7-6 7-12a7 7 0 0 0-14 0c0 6 7 12 7 12z"/>
-        <circle cx="12" cy="10" r="2.5"/>
-    </symbol>
-
-    <!-- Image -->
-    <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="4" width="18" height="16" rx="2"/>
-        <circle cx="9" cy="10" r="1.5"/>
-        <path d="m21 16-5-5-9 9"/>
-    </symbol>
+    <symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+    <symbol id="i-trending" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="i-rocket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></symbol>
+    <symbol id="i-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+    <symbol id="i-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></symbol>
+    <symbol id="i-pie" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></symbol>
+    <symbol id="i-file-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></symbol>
+    <symbol id="i-map-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></symbol>
 </svg>
 
-<!--  SPLASH SCREEN  -->
 <div id="splash-screen">
     <div class="splash-content">
         <div class="splash-logo">
@@ -339,36 +65,30 @@
             <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
                 <defs>
                     <linearGradient id="sg" x1="0" y1="0" x2="72" y2="72" gradientUnits="userSpaceOnUse">
-                        <stop offset="0%" stop-color="#D92B2B"/>
-                        <stop offset="100%" stop-color="#FF8C42"/>
+                        <stop offset="0%" stop-color="#6366F1"/>
+                        <stop offset="100%" stop-color="#8B5CF6"/>
                     </linearGradient>
                 </defs>
                 <rect width="72" height="72" rx="20" fill="url(#sg)"/>
-                <!-- �n lng trung thu -->
-                <path d="M29 20h14" stroke="white" stroke-width="3" stroke-linecap="round"/>
-                <path d="M31 20v4M41 20v4" stroke="white" stroke-width="3" stroke-linecap="round"/>
-                <path d="M26 28h20l-2 20H28L26 28z" stroke="white" stroke-width="3" stroke-linejoin="round"/>
-                <path d="M30 28c0 3 3 5 6 5s6-2 6-5" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M32 48v4M40 48v4" stroke="white" stroke-width="3" stroke-linecap="round"/>
-                <path d="M32 52h8" stroke="white" stroke-width="3" stroke-linecap="round"/>
-                <path d="M36 52v6" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="36" cy="34" r="22" stroke="white" stroke-width="4"/>
+                <path d="M29 34L35 40L47 28" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="36" cy="34" r="2" fill="white"/>
             </svg>
         </div>
         <h1 class="splash-title">Time<span>Tracker</span></h1>
-        <p class="splash-sub" data-i18n="app_subtitle">Chm c�ng & Lng</p>
+        <p class="splash-sub" data-i18n="app_subtitle">Chấm công & Lương</p>
         <div class="splash-loader"><div class="splash-loader-bar"></div></div>
         <p class="splash-version">v3.3</p>
     </div>
 </div>
 
-<!--  PIN LOCK  -->
 <div id="pin-lock" class="pin-lock hidden">
     <div class="pin-box">
         <div class="pin-icon">
-            <svg width="40" height="40" viewBox="0 0 24 24"><use href="#i-lock"/></svg>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         </div>
-        <h2 data-i18n="pin_title">Nhp m� PIN</h2>
-        <p class="pin-hint" data-i18n="pin_hint">Nhp 4 s  m kh�a</p>
+        <h2 data-i18n="pin_title">Nhập mã PIN</h2>
+        <p class="pin-hint" data-i18n="pin_hint">Nhập 4 số để mở khóa</p>
         <div class="pin-dots" id="pin-dots">
             <span></span><span></span><span></span><span></span>
         </div>
@@ -377,10 +97,10 @@
             <button data-num="4">4</button><button data-num="5">5</button><button data-num="6">6</button>
             <button data-num="7">7</button><button data-num="8">8</button><button data-num="9">9</button>
             <button data-num="clear" class="pin-fn" aria-label="Clear">
-                <svg width="20" height="20" viewBox="0 0 24 24"><use href="#i-x"/></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
             <button data-num="0">0</button>
-            <button data-num="back" class="pin-fn" aria-label="Backspace"></button>
+            <button data-num="back" class="pin-fn" aria-label="Backspace">⌫</button>
         </div>
         <p class="pin-error" id="pin-error"></p>
     </div>
@@ -388,11 +108,14 @@
 
 <div id="toast-container"></div>
 
-<!--  TOP BAR  -->
 <div class="top-bar" id="topBar">
     <div class="top-bar-left">
         <div class="brand-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24"><use href="#i-lantern"/></svg>
+            <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+                <circle cx="16" cy="15" r="9" stroke="white" stroke-width="2"/>
+                <path d="M13 15L16 18L21 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="16" cy="15" r="1" fill="white"/>
+            </svg>
         </div>
         <div class="brand-text">
             <h1 id="pageTitle">Dashboard</h1>
@@ -401,16 +124,15 @@
     </div>
     <div class="top-bar-right">
         <button class="icon-btn" id="theme-toggle" aria-label="Theme">
-            <svg width="18" height="18" viewBox="0 0 24 24"><use href="#i-moon"/></svg>
+            <svg width="18" height="18"><use href="#i-moon"/></svg>
         </button>
         <button class="icon-btn" id="lang-toggle" aria-label="Language">
-            <svg width="18" height="18" viewBox="0 0 24 24"><use href="#i-globe"/></svg>
+            <svg width="18" height="18"><use href="#i-globe"/></svg>
         </button>
     </div>
 </div>
 
 <div class="main-content">
-    <!--  PAGE DASHBOARD  -->
     <div id="page-dashboard" class="page-content">
         <div class="card hero-card" id="quick-checkin-card">
             <div class="hero-card-bg"></div>
@@ -419,7 +141,7 @@
                 <div class="hero-top">
                     <div class="hero-status" id="hero-status">
                         <span class="hero-status-dot"></span>
-                        <span class="hero-status-text">ang ti...</span>
+                        <span class="hero-status-text">Đang tải...</span>
                     </div>
                     <span class="hero-date" id="hero-date">--/--/----</span>
                 </div>
@@ -429,60 +151,60 @@
 
         <div id="reminder-banner" class="reminder-banner hidden">
             <span class="reminder-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24"><use href="#i-bell"/></svg>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             </span>
             <div class="reminder-text">
-                <strong data-i18n="reminder_title">Cha chm c�ng h�m nay!</strong>
-                <span data-i18n="reminder_sub">Bn qu�n chm c�ng �?</span>
+                <strong data-i18n="reminder_title">Chưa chấm công hôm nay!</strong>
+                <span data-i18n="reminder_sub">Bạn quên chấm công à?</span>
             </div>
-            <button class="btn btn-sm btn-primary" onclick="quickCheckIn()">Chm</button>
+            <button class="btn btn-sm btn-primary" onclick="quickCheckIn()">Chấm</button>
         </div>
 
         <div class="card achievements-card hidden" id="achievements-card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-trophy"/></svg></span>
-                <span data-i18n="achievements">Th�nh t�ch</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-trophy"/></svg></span>
+                <span data-i18n="achievements">Thành tích</span>
             </div>
             <div class="achievements-list" id="achievements-list"></div>
         </div>
 
         <div class="row stats-row">
             <div class="stat-card">
-                <div class="stat-icon"><svg width="20" height="20" viewBox="0 0 24 24"><use href="#i-calendar"/></svg></div>
+                <div class="stat-icon"><svg width="20" height="20"><use href="#i-calendar"/></svg></div>
                 <div class="stat-info">
-                    <div class="stat-label" data-i18n="days_worked">Ng�y c�ng</div>
+                    <div class="stat-label" data-i18n="days_worked">Ngày công</div>
                     <div class="stat-value" id="dash-total-days">0</div>
                 </div>
             </div>
             <div class="stat-card green">
-                <div class="stat-icon"><svg width="20" height="20" viewBox="0 0 24 24"><use href="#i-clock"/></svg></div>
+                <div class="stat-icon"><svg width="20" height="20"><use href="#i-clock"/></svg></div>
                 <div class="stat-info">
-                    <div class="stat-label" data-i18n="hours_worked">Gi l�m</div>
+                    <div class="stat-label" data-i18n="hours_worked">Giờ làm</div>
                     <div class="stat-value" id="dash-total-hours">0</div>
                 </div>
             </div>
             <div class="stat-card yellow">
-                <div class="stat-icon"><svg width="20" height="20" viewBox="0 0 24 24"><use href="#i-trending"/></svg></div>
+                <div class="stat-icon"><svg width="20" height="20"><use href="#i-trending"/></svg></div>
                 <div class="stat-info">
-                    <div class="stat-label" data-i18n="overtime">Tng ca</div>
+                    <div class="stat-label" data-i18n="overtime">Tăng ca</div>
                     <div class="stat-value" id="dash-total-ot">0</div>
                 </div>
             </div>
             <div class="stat-card blue">
-                <div class="stat-icon"><svg width="20" height="20" viewBox="0 0 24 24"><use href="#i-wallet"/></svg></div>
+                <div class="stat-icon"><svg width="20" height="20"><use href="#i-wallet"/></svg></div>
                 <div class="stat-info">
-                    <div class="stat-label" data-i18n="salary">Lng</div>
-                    <div class="stat-value" id="dash-current-salary">0</div>
+                    <div class="stat-label" data-i18n="salary">Lương</div>
+                    <div class="stat-value" id="dash-current-salary">0đ</div>
                 </div>
             </div>
         </div>
 
         <div class="card goal-card" id="goal-card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-target"/></svg></span>
-                <span data-i18n="monthly_goal">Mc ti�u th�ng</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-target"/></svg></span>
+                <span data-i18n="monthly_goal">Mục tiêu tháng</span>
                 <button class="btn btn-sm btn-secondary" style="margin-left:auto;" onclick="editGoal()">
-                    <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-edit"/></svg>
+                    <svg width="14" height="14"><use href="#i-edit"/></svg>
                 </button>
             </div>
             <div class="goal-body" id="goal-body"></div>
@@ -490,71 +212,70 @@
 
         <div class="card projected-card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-rocket"/></svg></span>
-                <span data-i18n="projected">D kin cui th�ng</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-rocket"/></svg></span>
+                <span data-i18n="projected">Dự kiến cuối tháng</span>
             </div>
-            <div class="projected-amount" id="dash-projected-salary">0</div>
+            <div class="projected-amount" id="dash-projected-salary">0đ</div>
             <div class="projected-progress">
                 <div class="progress-bar"><div class="progress-fill" id="dash-progress-fill" style="width:0%"></div></div>
                 <div class="progress-label">
                     <span class="progress-percent" id="dash-progress-percent">0%</span>
-                    <span><span data-i18n="remaining">C�n</span> <strong id="dash-days-remaining">0</strong> <span data-i18n="days">ng�y l�m vic</span></span>
+                    <span><span data-i18n="remaining">Còn</span> <strong id="dash-days-remaining">0</strong> <span data-i18n="days">ngày làm việc</span></span>
                 </div>
             </div>
         </div>
 
         <div class="card info-card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-info"/></svg></span>
-                <span data-i18n="info">Th�ng tin</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-info"/></svg></span>
+                <span data-i18n="info">Thông tin</span>
             </div>
             <div class="info-grid">
-                <div class="info-item"><span class="info-label" data-i18n="base_salary">Lng c bn</span><span class="info-value" id="dash-base-salary">5.900.000</span></div>
-                <div class="info-item"><span class="info-label" data-i18n="standard_days">Ng�y c�ng chun</span><span class="info-value" id="dash-standard-days">26</span></div>
-                <div class="info-item full"><span class="info-label" data-i18n="shifts_done">S ca � l�m</span><span class="info-value" id="dash-shift-count">0</span></div>
+                <div class="info-item"><span class="info-label" data-i18n="base_salary">Lương cơ bản</span><span class="info-value" id="dash-base-salary">5.900.000đ</span></div>
+                <div class="info-item"><span class="info-label" data-i18n="standard_days">Ngày công chuẩn</span><span class="info-value" id="dash-standard-days">26</span></div>
+                <div class="info-item full"><span class="info-label" data-i18n="shifts_done">Số ca đã làm</span><span class="info-value" id="dash-shift-count">0</span></div>
             </div>
         </div>
 
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-calendar"/></svg></span>
-                <span data-i18n="view_other_month">Xem th�ng kh�c</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-calendar"/></svg></span>
+                <span data-i18n="view_other_month">Xem tháng khác</span>
             </div>
             <div class="month-selector">
                 <select id="dash-month-select" class="form-control"></select>
                 <input type="number" id="dash-year-input" class="form-control" min="2000" max="2100">
                 <button class="btn btn-sm btn-primary" onclick="loadDashboard()" data-i18n="view">Xem</button>
                 <button class="btn btn-sm btn-secondary btn-icon" onclick="goToCurrentMonth('dashboard')" aria-label="Refresh">
-                    <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-refresh"/></svg>
+                    <svg width="14" height="14"><use href="#i-refresh"/></svg>
                 </button>
             </div>
-            <div class="view-label"><span data-i18n="viewing">ang xem</span>: <strong id="dash-current-view">10/2026</strong></div>
+            <div class="view-label"><span data-i18n="viewing">Đang xem</span>: <strong id="dash-current-view">10/2026</strong></div>
         </div>
     </div>
 
-    <!--  PAGE CALENDAR  -->
     <div id="page-calendar" class="page-content hidden">
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-calendar"/></svg></span>
-                <span data-i18n="calendar">Lch th�ng</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-calendar"/></svg></span>
+                <span data-i18n="calendar">Lịch tháng</span>
             </div>
 
             <div class="cal-mode-tabs">
-                <button class="active" data-cal-tab="solar" onclick="switchCalTab('solar')"> Dng lch</button>
-                <button data-cal-tab="lunar" onclick="switchCalTab('lunar')"> �m lch</button>
+                <button class="active" data-cal-tab="solar" onclick="switchCalTab('solar')">📅 Dương lịch</button>
+                <button data-cal-tab="lunar" onclick="switchCalTab('lunar')">🌙 Âm lịch</button>
             </div>
 
             <div class="calendar-nav">
                 <button class="btn btn-sm btn-secondary btn-icon" onclick="calPrev()" aria-label="Previous">
-                    <svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-chevron-left"/></svg>
+                    <svg width="16" height="16"><use href="#i-chevron-left"/></svg>
                 </button>
-                <h3 id="cal-title" class="cal-title">Th�ng 10/2026</h3>
+                <h3 id="cal-title" class="cal-title">Tháng 10/2026</h3>
                 <button class="btn btn-sm btn-secondary btn-icon" onclick="calNext()" aria-label="Next">
-                    <svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-chevron-right"/></svg>
+                    <svg width="16" height="16"><use href="#i-chevron-right"/></svg>
                 </button>
                 <button class="btn btn-sm btn-secondary btn-icon" onclick="calToday()" aria-label="Today">
-                    <svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-map-pin"/></svg>
+                    <svg width="16" height="16"><use href="#i-map-pin"/></svg>
                 </button>
             </div>
             <div class="calendar-weekdays" id="calendar-weekdays">
@@ -564,48 +285,48 @@
 
             <div class="calendar-legend">
                 <div class="legend-group">
-                    <span class="legend-group-title">Trng th�i ng�y</span>
+                    <span class="legend-group-title">Trạng thái ngày</span>
                     <div class="legend-items">
                         <div class="legend-item">
                             <span class="legend-swatch done"></span>
-                            <span>� i l�m</span>
+                            <span>Đã đi làm</span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-swatch absent"></span>
-                            <span>� ngh <small>(kh�ng i l�m)</small></span>
+                            <span>Đã nghỉ <small>(không đi làm)</small></span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-swatch sunday"></span>
-                            <span>Ch nht</span>
+                            <span>Chủ nhật</span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-swatch today"></span>
-                            <span>H�m nay</span>
+                            <span>Hôm nay</span>
                         </div>
                     </div>
                 </div>
                 <div class="legend-group">
-                    <span class="legend-group-title">Ng�y l</span>
+                    <span class="legend-group-title">Ngày lễ</span>
                     <div class="legend-items">
                         <div class="legend-item">
                             <span class="legend-swatch paid"></span>
-                            <span>L c� lng <small>(i l�m x3)</small></span>
+                            <span>Lễ có lương <small>(đi làm x3)</small></span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-swatch social"></span>
-                            <span>K nim</span>
+                            <span>Kỷ niệm</span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-swatch trad"></span>
-                            <span>Truyn thng</span>
+                            <span>Truyền thống</span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-swatch religion"></span>
-                            <span>T�n gi�o</span>
+                            <span>Tôn giáo</span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-swatch recurring"></span>
-                            <span>M�ng 1, Rm</span>
+                            <span>Mùng 1, Rằm</span>
                         </div>
                     </div>
                 </div>
@@ -614,124 +335,122 @@
 
         <div class="card" id="cal-day-detail" style="display:none;">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-file-text"/></svg></span>
-                <span id="cal-detail-title">Chi tit ng�y</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-file-text"/></svg></span>
+                <span id="cal-detail-title">Chi tiết ngày</span>
                 <button class="btn btn-sm btn-secondary btn-icon" style="margin-left:auto;" onclick="closeCalDetail()" aria-label="Close">
-                    <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-x"/></svg>
+                    <svg width="14" height="14"><use href="#i-x"/></svg>
                 </button>
             </div>
             <div id="cal-detail-body"></div>
         </div>
     </div>
 
-    <!--  PAGE WORKLOG  -->
     <div id="page-worklog" class="page-content hidden">
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-file-text"/></svg></span>
-                <span data-i18n="enter_worklog">Nhp chm c�ng</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-file-text"/></svg></span>
+                <span data-i18n="enter_worklog">Nhập chấm công</span>
             </div>
             <div class="flex justify-between items-center mb-10">
-                <label style="font-weight:600;font-size:13px;" data-i18n="work_date">Ng�y l�m vic</label>
+                <label style="font-weight:600;font-size:13px;" data-i18n="work_date">Ngày làm việc</label>
                 <button class="btn btn-sm btn-primary" onclick="setToday()">
-                    <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-calendar"/></svg>
-                    <span data-i18n="today">H�m nay</span>
+                    <svg width="14" height="14"><use href="#i-calendar"/></svg>
+                    <span data-i18n="today">Hôm nay</span>
                 </button>
             </div>
             <div class="form-group"><input type="date" id="worklog-date" class="form-control"></div>
             <div class="row">
                 <div class="form-group" style="grid-column:1/2;">
-                    <label data-i18n="shift">Ca l�m</label>
+                    <label data-i18n="shift">Ca làm</label>
                     <select id="worklog-shift" class="form-control">
-                        <option value="S�ng" data-i18n="shift_morning"> Ca s�ng</option>
-                        <option value="�m" data-i18n="shift_night"> Ca �m</option>
+                        <option value="Sáng" data-i18n="shift_morning">☀️ Ca sáng</option>
+                        <option value="Đêm" data-i18n="shift_night">🌙 Ca đêm</option>
                     </select>
                 </div>
                 <div class="form-group" style="grid-column:2/3;">
-                    <label data-i18n="day_type">Loi ng�y</label>
+                    <label data-i18n="day_type">Loại ngày</label>
                     <select id="worklog-type" class="form-control">
-                        <option value="normal" data-i18n="day_normal">Ng�y thng</option>
-                        <option value="sunday" data-i18n="day_sunday">Ch nht</option>
+                        <option value="normal" data-i18n="day_normal">Ngày thường</option>
+                        <option value="sunday" data-i18n="day_sunday">Chủ nhật</option>
                     </select>
                 </div>
             </div>
             <div class="row">
                 <div class="form-group" style="grid-column:1/2;">
-                    <label data-i18n="start">Gi bt u</label>
+                    <label data-i18n="start">Giờ bắt đầu</label>
                     <input type="time" id="worklog-start" class="form-control">
                 </div>
                 <div class="form-group" style="grid-column:2/3;">
-                    <label data-i18n="end">Gi kt th�c</label>
+                    <label data-i18n="end">Giờ kết thúc</label>
                     <input type="time" id="worklog-end" class="form-control">
                 </div>
             </div>
             <div class="form-group">
-                <label data-i18n="note">Ghi ch�</label>
-                <input type="text" id="worklog-note" class="form-control" placeholder="VD: i tr 15 ph�t...">
+                <label data-i18n="note">Ghi chú</label>
+                <input type="text" id="worklog-note" class="form-control" placeholder="VD: Đi trễ 15 phút...">
             </div>
             <div class="preview-box">
-                <div class="preview-label" data-i18n="preview">Xem trc</div>
+                <div class="preview-label" data-i18n="preview">Xem trước</div>
                 <div class="preview-grid">
-                    <div><span class="preview-sub" data-i18n="regular_hours">Gi thng</span><br><strong id="preview-regular" class="preview-number">0.00</strong></div>
-                    <div><span class="preview-sub" data-i18n="ot_hours">Tng ca</span><br><strong id="preview-ot" class="preview-number warning">0.00</strong></div>
-                    <div><span class="preview-sub" data-i18n="pay">Tin c�ng</span><br><strong id="preview-pay" class="preview-number primary">0</strong></div>
+                    <div><span class="preview-sub" data-i18n="regular_hours">Giờ thường</span><br><strong id="preview-regular" class="preview-number">0.00</strong></div>
+                    <div><span class="preview-sub" data-i18n="ot_hours">Tăng ca</span><br><strong id="preview-ot" class="preview-number warning">0.00</strong></div>
+                    <div><span class="preview-sub" data-i18n="pay">Tiền công</span><br><strong id="preview-pay" class="preview-number primary">0đ</strong></div>
                 </div>
             </div>
             <button class="btn btn-primary w-full" onclick="addWorkLog()">
-                <svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-save"/></svg>
-                <span data-i18n="save">Lu chm c�ng</span>
+                <svg width="16" height="16"><use href="#i-save"/></svg>
+                <span data-i18n="save">Lưu chấm công</span>
             </button>
         </div>
 
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-file-text"/></svg></span>
-                <span id="worklog-month-title">TH�NG 10/2026</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-file-text"/></svg></span>
+                <span id="worklog-month-title">THÁNG 10/2026</span>
             </div>
             <div class="month-selector">
                 <select id="worklog-month-select" class="form-control"></select>
                 <input type="number" id="worklog-year-input" class="form-control" min="2000" max="2100" value="2026">
                 <button class="btn btn-sm btn-primary" onclick="applyWorklogMonthFilter()" data-i18n="view">Xem</button>
                 <button class="btn btn-sm btn-secondary btn-icon" onclick="goToCurrentMonth('worklog')" aria-label="Refresh">
-                    <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-refresh"/></svg>
+                    <svg width="14" height="14"><use href="#i-refresh"/></svg>
                 </button>
             </div>
             <div class="table-responsive">
                 <table>
                     <thead><tr>
-                        <th data-i18n="col_date">Ng�y</th>
+                        <th data-i18n="col_date">Ngày</th>
                         <th data-i18n="col_shift">Ca</th>
-                        <th data-i18n="col_type">Loi</th>
-                        <th data-i18n="col_in">V�o</th>
+                        <th data-i18n="col_type">Loại</th>
+                        <th data-i18n="col_in">Vào</th>
                         <th data-i18n="col_out">Ra</th>
-                        <th data-i18n="col_reg">Thng</th>
+                        <th data-i18n="col_reg">Thường</th>
                         <th data-i18n="col_ot">TC</th>
-                        <th data-i18n="col_pay">Tin</th>
+                        <th data-i18n="col_pay">Tiền</th>
                         <th></th>
                     </tr></thead>
                     <tbody id="worklog-table-body"></tbody>
                 </table>
             </div>
-            <p class="text-muted mt-10" id="worklog-empty" style="text-align:center;padding:20px 0;"> <span data-i18n="no_data">Kh�ng c� d liu</span></p>
+            <p class="text-muted mt-10" id="worklog-empty" style="text-align:center;padding:20px 0;">📭 <span data-i18n="no_data">Không có dữ liệu</span></p>
         </div>
     </div>
 
-    <!--  PAGE STATISTICS  -->
     <div id="page-statistics" class="page-content hidden">
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-chart"/></svg></span>
-                <span data-i18n="statistics">Thng k� th�ng</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-chart"/></svg></span>
+                <span data-i18n="statistics">Thống kê tháng</span>
             </div>
             <div class="month-selector">
                 <select id="stat-month-select" class="form-control"></select>
                 <input type="number" id="stat-year-input" class="form-control" min="2000" max="2100" value="2026">
                 <button class="btn btn-success" onclick="loadStatistics()">
-                    <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-chart"/></svg>
+                    <svg width="14" height="14"><use href="#i-chart"/></svg>
                     <span data-i18n="view">Xem</span>
                 </button>
                 <button class="btn btn-sm btn-secondary btn-icon" onclick="goToCurrentMonth('statistics')" aria-label="Refresh">
-                    <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-refresh"/></svg>
+                    <svg width="14" height="14"><use href="#i-refresh"/></svg>
                 </button>
             </div>
         </div>
@@ -739,54 +458,53 @@
 
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-chart"/></svg></span>
-                <span data-i18n="daily_hours">Gi l�m theo ng�y</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-chart"/></svg></span>
+                <span data-i18n="daily_hours">Giờ làm theo ngày</span>
             </div>
             <div id="chart-daily" class="chart-container"></div>
         </div>
 
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-pie"/></svg></span>
-                <span data-i18n="shift_ratio">T l ca l�m</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-pie"/></svg></span>
+                <span data-i18n="shift_ratio">Tỉ lệ ca làm</span>
             </div>
             <div id="chart-shifts" class="chart-container"></div>
         </div>
 
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-trending"/></svg></span>
-                <span data-i18n="trend">Xu hng 6 th�ng</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-trending"/></svg></span>
+                <span data-i18n="trend">Xu hướng 6 tháng</span>
             </div>
             <div id="chart-trend" class="chart-container"></div>
         </div>
 
         <div style="margin-bottom:14px;">
             <button class="btn btn-danger w-full" onclick="exportImage()" id="image-export-btn" style="min-height:52px;font-size:15px;">
-                <svg width="18" height="18" viewBox="0 0 24 24"><use href="#i-image"/></svg>
-                <span> Xut nh PNG</span>
+                <svg width="18" height="18"><use href="#i-image"/></svg>
+                <span>📸 Xuất ảnh PNG</span>
             </button>
         </div>
     </div>
 
-    <!--  PAGE SETTINGS  -->
     <div id="page-settings" class="page-content hidden">
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-users"/></svg></span>
-                <span data-i18n="profiles">H s</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-users"/></svg></span>
+                <span data-i18n="profiles">Hồ sơ</span>
             </div>
             <div id="profile-list" class="profile-list"></div>
             <button class="btn btn-primary w-full" onclick="addNewProfile()" style="margin-top:8px;">
-                <svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-plus"/></svg>
-                <span data-i18n="add_profile">Th�m h s</span>
+                <svg width="16" height="16"><use href="#i-plus"/></svg>
+                <span data-i18n="add_profile">Thêm hồ sơ</span>
             </button>
         </div>
 
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-palette"/></svg></span>
-                <span data-i18n="appearance">Giao din</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-palette"/></svg></span>
+                <span data-i18n="appearance">Giao diện</span>
             </div>
             <div class="theme-picker" id="theme-picker">
                 <button data-theme-color="indigo" class="theme-swatch" style="background:linear-gradient(135deg,#6366F1,#8B5CF6);" aria-label="Indigo"></button>
@@ -795,24 +513,24 @@
                 <button data-theme-color="amber" class="theme-swatch" style="background:linear-gradient(135deg,#F59E0B,#FBBF24);" aria-label="Amber"></button>
             </div>
             <div class="form-group" style="margin-top:14px;">
-                <label data-i18n="theme_mode">Ch </label>
+                <label data-i18n="theme_mode">Chế độ</label>
                 <select id="theme-mode-select" class="form-control">
-                    <option value="auto" data-i18n="theme_auto">T ng</option>
-                    <option value="light" data-i18n="theme_light">S�ng</option>
-                    <option value="dark" data-i18n="theme_dark">Ti</option>
+                    <option value="auto" data-i18n="theme_auto">Tự động</option>
+                    <option value="light" data-i18n="theme_light">Sáng</option>
+                    <option value="dark" data-i18n="theme_dark">Tối</option>
                 </select>
             </div>
             <div class="form-group">
                 <label class="toggle-label">
-                    <span data-i18n="haptic"> Rung khi chm c�ng</span>
+                    <span data-i18n="haptic">📳 Rung khi chấm công</span>
                     <input type="checkbox" id="set-haptic" class="toggle-input" checked>
                 </label>
                 <label class="toggle-label">
-                    <span data-i18n="sound"> �m thanh</span>
+                    <span data-i18n="sound">🔊 Âm thanh</span>
                     <input type="checkbox" id="set-sound" class="toggle-input" checked>
                 </label>
                 <label class="toggle-label">
-                    <span data-i18n="reminders"> Nhc nh</span>
+                    <span data-i18n="reminders">🔔 Nhắc nhở</span>
                     <input type="checkbox" id="set-reminders" class="toggle-input" checked>
                 </label>
             </div>
@@ -820,45 +538,45 @@
 
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-shield"/></svg></span>
-                <span data-i18n="security">Bo mt</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-shield"/></svg></span>
+                <span data-i18n="security">Bảo mật</span>
             </div>
             <div class="form-group">
                 <label class="toggle-label">
-                    <span data-i18n="pin_lock">Kh�a PIN</span>
+                    <span data-i18n="pin_lock">Khóa PIN</span>
                     <input type="checkbox" id="set-pin-enabled" class="toggle-input">
                 </label>
             </div>
             <div id="pin-setup" style="display:none;">
                 <div class="form-group">
-                    <label data-i18n="pin_new">PIN mi (4 s)</label>
-                    <input type="password" id="set-pin-value" class="form-control" maxlength="4" inputmode="numeric" placeholder="����">
+                    <label data-i18n="pin_new">PIN mới (4 số)</label>
+                    <input type="password" id="set-pin-value" class="form-control" maxlength="4" inputmode="numeric" placeholder="••••">
                 </div>
             </div>
         </div>
 
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-wallet"/></svg></span>
-                <span data-i18n="base_salary_full">Lng c bn</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-wallet"/></svg></span>
+                <span data-i18n="base_salary_full">Lương cơ bản</span>
             </div>
             <div class="row">
                 <div class="form-group" style="grid-column:1/2;">
-                    <label data-i18n="base_salary_input">Lng c bn (/th�ng)</label>
+                    <label data-i18n="base_salary_input">Lương cơ bản (đ/tháng)</label>
                     <input type="number" id="set-base-salary" class="form-control" value="5900000">
                 </div>
                 <div class="form-group" style="grid-column:2/3;">
-                    <label data-i18n="standard_days_input">Ng�y c�ng chun</label>
+                    <label data-i18n="standard_days_input">Ngày công chuẩn</label>
                     <input type="number" id="set-standard-days" class="form-control" value="26">
                 </div>
             </div>
             <div class="row">
                 <div class="form-group" style="grid-column:1/2;">
-                    <label data-i18n="standard_hours">Gi chun/ca</label>
+                    <label data-i18n="standard_hours">Giờ chuẩn/ca</label>
                     <input type="number" id="set-standard-hours" class="form-control" value="8" step="0.5">
                 </div>
                 <div class="form-group" style="grid-column:2/3;">
-                    <label data-i18n="break_hours">Gi ngh gia ca</label>
+                    <label data-i18n="break_hours">Giờ nghỉ giữa ca</label>
                     <input type="number" id="set-break-hours" class="form-control" value="1" step="0.5">
                 </div>
             </div>
@@ -866,16 +584,16 @@
 
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-trending"/></svg></span>
-                <span data-i18n="ot_coeff">H s tng ca</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-trending"/></svg></span>
+                <span data-i18n="ot_coeff">Hệ số tăng ca</span>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                <div class="form-group"><label data-i18n="ot_normal_day">Thng - S�ng</label><input type="number" id="set-ot-normal-day" class="form-control" value="1.5" step="0.1"></div>
-                <div class="form-group"><label data-i18n="ot_normal_night">Thng - �m</label><input type="number" id="set-ot-normal-night" class="form-control" value="1.7" step="0.1"></div>
-                <div class="form-group"><label data-i18n="ot_sunday_day">Ch nht - S�ng</label><input type="number" id="set-ot-sunday-day" class="form-control" value="2.0" step="0.1"></div>
-                <div class="form-group"><label data-i18n="ot_sunday_night">Ch nht - �m</label><input type="number" id="set-ot-sunday-night" class="form-control" value="2.7" step="0.1"></div>
+                <div class="form-group"><label data-i18n="ot_normal_day">Thường - Sáng</label><input type="number" id="set-ot-normal-day" class="form-control" value="1.5" step="0.1"></div>
+                <div class="form-group"><label data-i18n="ot_normal_night">Thường - Đêm</label><input type="number" id="set-ot-normal-night" class="form-control" value="1.7" step="0.1"></div>
+                <div class="form-group"><label data-i18n="ot_sunday_day">Chủ nhật - Sáng</label><input type="number" id="set-ot-sunday-day" class="form-control" value="2.0" step="0.1"></div>
+                <div class="form-group"><label data-i18n="ot_sunday_night">Chủ nhật - Đêm</label><input type="number" id="set-ot-sunday-night" class="form-control" value="2.7" step="0.1"></div>
                 <div class="form-group" style="grid-column:1/-1;">
-                    <label data-i18n="ot_holiday"> H s tng ca ng�y l bt buc</label>
+                    <label data-i18n="ot_holiday">⚡ Hệ số tăng ca ngày lễ bắt buộc</label>
                     <input type="number" id="set-ot-holiday" class="form-control" value="3.0" step="0.1">
                 </div>
             </div>
@@ -883,38 +601,38 @@
 
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-clock"/></svg></span>
-                <span data-i18n="default_times">Thi gian mc nh</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-clock"/></svg></span>
+                <span data-i18n="default_times">Thời gian mặc định</span>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                <div class="form-group"><label data-i18n="morning_start">Ca s�ng bt u</label><input type="time" id="set-morning-start" class="form-control" value="07:30"></div>
-                <div class="form-group"><label data-i18n="morning_end">Ca s�ng kt th�c</label><input type="time" id="set-morning-end" class="form-control" value="19:30"></div>
-                <div class="form-group"><label data-i18n="night_start">Ca �m bt u</label><input type="time" id="set-night-start" class="form-control" value="19:30"></div>
-                <div class="form-group"><label data-i18n="night_end">Ca �m kt th�c</label><input type="time" id="set-night-end" class="form-control" value="07:30"></div>
+                <div class="form-group"><label data-i18n="morning_start">Ca sáng bắt đầu</label><input type="time" id="set-morning-start" class="form-control" value="07:30"></div>
+                <div class="form-group"><label data-i18n="morning_end">Ca sáng kết thúc</label><input type="time" id="set-morning-end" class="form-control" value="19:30"></div>
+                <div class="form-group"><label data-i18n="night_start">Ca đêm bắt đầu</label><input type="time" id="set-night-start" class="form-control" value="19:30"></div>
+                <div class="form-group"><label data-i18n="night_end">Ca đêm kết thúc</label><input type="time" id="set-night-end" class="form-control" value="07:30"></div>
             </div>
         </div>
 
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-database"/></svg></span>
-                <span data-i18n="backup">Sao lu & Kh�i phc</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-database"/></svg></span>
+                <span data-i18n="backup">Sao lưu & Khôi phục</span>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
                 <button class="btn btn-success" onclick="exportBackup()" style="flex:1;">
-                    <svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-download"/></svg>
-                    <span data-i18n="backup_btn">Sao lu</span>
+                    <svg width="16" height="16"><use href="#i-download"/></svg>
+                    <span data-i18n="backup_btn">Sao lưu</span>
                 </button>
                 <button class="btn btn-warning" onclick="document.getElementById('restore-file-input').click()" style="flex:1;">
-                    <svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-upload"/></svg>
-                    <span data-i18n="restore_btn">Kh�i phc</span>
+                    <svg width="16" height="16"><use href="#i-upload"/></svg>
+                    <span data-i18n="restore_btn">Khôi phục</span>
                 </button>
                 <input type="file" id="restore-file-input" accept=".json" style="display:none;" onchange="handleRestoreFile(event)">
             </div>
             <div id="restore-info" style="display:none;" class="restore-info-box">
                 <div id="restore-details"></div>
                 <div style="display:flex;gap:8px;margin-top:10px;">
-                    <button class="btn btn-danger" onclick="confirmRestore()" style="flex:1;"> <span data-i18n="confirm">X�c nhn</span></button>
-                    <button class="btn btn-secondary" onclick="cancelRestore()" style="flex:1;" data-i18n="cancel">Hy</button>
+                    <button class="btn btn-danger" onclick="confirmRestore()" style="flex:1;">⚠️ <span data-i18n="confirm">Xác nhận</span></button>
+                    <button class="btn btn-secondary" onclick="cancelRestore()" style="flex:1;" data-i18n="cancel">Hủy</button>
                 </div>
             </div>
             <div id="backup-message" class="mt-10" style="font-weight:500;"></div>
@@ -922,36 +640,36 @@
 
         <div class="card">
             <div class="card-header">
-                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-trash"/></svg></span>
-                <span data-i18n="delete_old">X�a d liu c</span>
+                <span class="icon"><svg width="16" height="16"><use href="#i-trash"/></svg></span>
+                <span data-i18n="delete_old">Xóa dữ liệu cũ</span>
             </div>
-            <p class="text-muted" style="font-size:13px;" data-i18n="delete_desc">X�a tt c d liu trc th�ng chn</p>
+            <p class="text-muted" style="font-size:13px;" data-i18n="delete_desc">Xóa tất cả dữ liệu trước tháng chọn</p>
             <div class="row">
                 <div class="form-group" style="grid-column:1/2;">
-                    <label data-i18n="month">Th�ng</label>
+                    <label data-i18n="month">Tháng</label>
                     <select id="delete-month" class="form-control"></select>
                 </div>
                 <div class="form-group" style="grid-column:2/3;">
-                    <label data-i18n="year">Nm</label>
+                    <label data-i18n="year">Năm</label>
                     <input type="number" id="delete-year" class="form-control" min="2000" max="2100" value="2025">
                 </div>
             </div>
-            <div class="delete-warning"> <span data-i18n="will_delete">X�a</span> <strong id="delete-count">0</strong> <span data-i18n="records_before">bn ghi trc</span> <strong id="delete-month-label">01/2025</strong></div>
+            <div class="delete-warning">⚠️ <span data-i18n="will_delete">Xóa</span> <strong id="delete-count">0</strong> <span data-i18n="records_before">bản ghi trước</span> <strong id="delete-month-label">01/2025</strong></div>
             <button class="btn btn-danger w-full" onclick="confirmDeleteOldData()">
-                <svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-trash"/></svg>
-                <span data-i18n="delete_btn">X�a d liu c</span>
+                <svg width="16" height="16"><use href="#i-trash"/></svg>
+                <span data-i18n="delete_btn">Xóa dữ liệu cũ</span>
             </button>
             <p id="delete-message" class="mt-10" style="font-weight:500;"></p>
         </div>
 
         <div style="display:flex;gap:8px;">
             <button class="btn btn-success" onclick="saveSettings()" style="flex:1;">
-                <svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-save"/></svg>
-                <span data-i18n="save_settings">Lu c�i t</span>
+                <svg width="16" height="16"><use href="#i-save"/></svg>
+                <span data-i18n="save_settings">Lưu cài đặt</span>
             </button>
             <button class="btn btn-secondary" onclick="resetSettings()" style="flex:1;">
-                <svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-refresh"/></svg>
-                <span data-i18n="reset">Mc nh</span>
+                <svg width="16" height="16"><use href="#i-refresh"/></svg>
+                <span data-i18n="reset">Mặc định</span>
             </button>
         </div>
         <p id="settings-message" class="mt-10" style="color:var(--success);font-weight:500;"></p>
@@ -959,88 +677,85 @@
     </div>
 </div>
 
-<!--  FAB  -->
 <button class="fab" id="fab" onclick="fabAction()" aria-label="Quick check-in">
-    <svg width="26" height="26" viewBox="0 0 24 24"><use href="#i-zap"/></svg>
+    <svg width="26" height="26"><use href="#i-zap"/></svg>
 </button>
 
-<!--  BOTTOM NAV  -->
 <div class="bottom-nav">
     <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')" role="button" tabindex="0">
-        <svg width="22" height="22" viewBox="0 0 24 24"><use href="#i-home"/></svg>
+        <svg width="22" height="22"><use href="#i-home"/></svg>
         <span data-i18n="nav_home">Home</span>
     </div>
     <div class="nav-item" data-page="calendar" onclick="switchPage('calendar')" role="button" tabindex="0">
-        <svg width="22" height="22" viewBox="0 0 24 24"><use href="#i-calendar"/></svg>
-        <span data-i18n="nav_calendar">Lch</span>
+        <svg width="22" height="22"><use href="#i-calendar"/></svg>
+        <span data-i18n="nav_calendar">Lịch</span>
     </div>
     <div class="nav-item" data-page="worklog" onclick="switchPage('worklog')" role="button" tabindex="0">
-        <svg width="22" height="22" viewBox="0 0 24 24"><use href="#i-edit"/></svg>
-        <span data-i18n="nav_worklog">Chm</span>
+        <svg width="22" height="22"><use href="#i-edit"/></svg>
+        <span data-i18n="nav_worklog">Chấm</span>
     </div>
     <div class="nav-item" data-page="statistics" onclick="switchPage('statistics')" role="button" tabindex="0">
-        <svg width="22" height="22" viewBox="0 0 24 24"><use href="#i-chart"/></svg>
-        <span data-i18n="nav_stats">Thng k�</span>
+        <svg width="22" height="22"><use href="#i-chart"/></svg>
+        <span data-i18n="nav_stats">Thống kê</span>
     </div>
     <div class="nav-item" data-page="settings" onclick="switchPage('settings')" role="button" tabindex="0">
-        <svg width="22" height="22" viewBox="0 0 24 24"><use href="#i-settings"/></svg>
-        <span data-i18n="nav_settings">C�i t</span>
+        <svg width="22" height="22"><use href="#i-settings"/></svg>
+        <span data-i18n="nav_settings">Cài đặt</span>
     </div>
 </div>
 
 <div id="confetti-layer"></div>
 
-<!--  SCRIPTS  -->
-<script src="lunar-engine.js?v=4"></script>
-<script src="holiday-data.js?v=4"></script>
-<script src="holiday-resolver.js?v=4"></script>
+<!-- ═══ SCRIPTS ═══ -->
+<script src="lunar-engine.js?v=2"></script>
+<script src="holiday-data.js?v=2"></script>
+<script src="holiday-resolver.js?v=2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
-<script src="effects.js?v=4"></script>
-<script src="image-export.js?v=4"></script>
-<script src="script.js?v=4"></script>
-
-<!--  SERVICE WORKER � T ng cp nht  -->
+<script src="effects.js?v=2"></script>
+<script src="image-export.js?v=2"></script>
+<script src="script.js?v=2"></script>
+<!-- ═══ SERVICE WORKER — Tự động cập nhật ═══ -->
 <script>
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
             .then(reg => {
-                console.log(' SW registered');
-
-                // Kim tra update mi 5 ph�t
+                console.log('✅ SW registered');
+                
+                // Kiểm tra update mỗi 5 phút
                 setInterval(() => {
                     reg.update().catch(() => {});
                 }, 5 * 60 * 1000);
-
-                // Kim tra khi quay li tab
+                
+                // Kiểm tra khi quay lại tab
                 document.addEventListener('visibilitychange', () => {
                     if (document.visibilityState === 'visible') {
                         reg.update().catch(() => {});
                     }
                 });
-
-                // Khi c� SW mi
+                
+                // Khi có SW mới
                 reg.addEventListener('updatefound', () => {
                     const newWorker = reg.installing;
-                    console.log(' C� version mi!');
-
+                    console.log('🆕 Có version mới!');
+                    
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            console.log(' Force update...');
+                            console.log('🔄 Force update...');
                             newWorker.postMessage('SKIP_WAITING');
                             setTimeout(() => window.location.reload(), 500);
                         }
                     });
                 });
             })
-            .catch(err => console.error(' SW failed:', err));
-
-        // Khi SW i  Reload
+            .catch(err => console.error('❌ SW failed:', err));
+        
+        // Khi SW đổi → Reload
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (refreshing) return;
             refreshing = true;
-            console.log(' Controller changed  Reload');
+            console.log('🔄 Controller changed → Reload');
             window.location.reload();
         });
     });
