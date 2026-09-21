@@ -4,7 +4,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 // ⚠️ ĐỔI SỐ NÀY MỖI LẦN UPDATE
-const CACHE_VERSION = 'v4.1.3';
+const CACHE_VERSION = 'v4.1.4';
 const CACHE_NAME = `timetracker-${CACHE_VERSION}`;
 
 // Files cần cache
