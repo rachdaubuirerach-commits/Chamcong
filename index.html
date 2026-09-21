@@ -714,5 +714,52 @@
 <script src="effects.js?v=2"></script>
 <script src="image-export.js?v=2"></script>
 <script src="script.js?v=2"></script>
+<!-- ═══ SERVICE WORKER — Tự động cập nhật ═══ -->
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => {
+                console.log('✅ SW registered');
+                
+                // Kiểm tra update mỗi 5 phút
+                setInterval(() => {
+                    reg.update().catch(() => {});
+                }, 5 * 60 * 1000);
+                
+                // Kiểm tra khi quay lại tab
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') {
+                        reg.update().catch(() => {});
+                    }
+                });
+                
+                // Khi có SW mới
+                reg.addEventListener('updatefound', () => {
+                    const newWorker = reg.installing;
+                    console.log('🆕 Có version mới!');
+                    
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            console.log('🔄 Force update...');
+                            newWorker.postMessage('SKIP_WAITING');
+                            setTimeout(() => window.location.reload(), 500);
+                        }
+                    });
+                });
+            })
+            .catch(err => console.error('❌ SW failed:', err));
+        
+        // Khi SW đổi → Reload
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            refreshing = true;
+            console.log('🔄 Controller changed → Reload');
+            window.location.reload();
+        });
+    });
+}
+</script>
 </body>
 </html>
