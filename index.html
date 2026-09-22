@@ -3,22 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#4F46E5">
+    <meta name="theme-color" content="#C1272D">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="manifest" href="manifest.json">
-    <title>TimeTracker v3.3</title>
+    <title>TimeTracker v4.2 — Tết Trung Thu</title>
 
     <!-- Preconnect CDN để tải nhanh hơn -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+
+    <!-- Retro Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800;900&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=Dancing+Script:wght@400;600;700&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="style.css?v=2">
     <link rel="stylesheet" href="style-effects.css?v=2">
+    <link rel="stylesheet" href="style-retro-tettrungthu.css?v=1">
 </head>
-<body>
+<body class="retro-mode">
 
+<!-- ═══════════════════════════════════════════════════════════
+     SVG ICON LIBRARY
+     ═══════════════════════════════════════════════════════════ -->
 <svg style="display:none" xmlns="http://www.w3.org/2000/svg">
     <symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
     <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>
@@ -56,17 +65,27 @@
     <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></symbol>
     <symbol id="i-map-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
     <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></symbol>
+    <symbol id="i-lantern" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v3M12 19v3"/><ellipse cx="12" cy="11" rx="6" ry="8"/><path d="M6 11h12"/><path d="M8 4h8"/><path d="M8 18h8"/></symbol>
 </svg>
 
+<!-- ═══════════════════════════════════════════════════════════
+     SPLASH SCREEN
+     ═══════════════════════════════════════════════════════════ -->
 <div id="splash-screen">
     <div class="splash-content">
+        <!-- Đèn lồng trang trí -->
+        <div class="retro-lanterns">
+            <span class="retro-lantern">🏮</span>
+            <span class="retro-lantern">🏮</span>
+            <span class="retro-lantern">🏮</span>
+        </div>
         <div class="splash-logo">
             <div class="splash-ring"></div>
             <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
                 <defs>
                     <linearGradient id="sg" x1="0" y1="0" x2="72" y2="72" gradientUnits="userSpaceOnUse">
-                        <stop offset="0%" stop-color="#6366F1"/>
-                        <stop offset="100%" stop-color="#8B5CF6"/>
+                        <stop offset="0%" stop-color="#C1272D"/>
+                        <stop offset="100%" stop-color="#D4A017"/>
                     </linearGradient>
                 </defs>
                 <rect width="72" height="72" rx="20" fill="url(#sg)"/>
@@ -78,10 +97,13 @@
         <h1 class="splash-title">Time<span>Tracker</span></h1>
         <p class="splash-sub" data-i18n="app_subtitle">Chấm công & Lương</p>
         <div class="splash-loader"><div class="splash-loader-bar"></div></div>
-        <p class="splash-version">v3.3</p>
+        <p class="splash-version">v4.2 · Tết Trung Thu</p>
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════
+     PIN LOCK
+     ═══════════════════════════════════════════════════════════ -->
 <div id="pin-lock" class="pin-lock hidden">
     <div class="pin-box">
         <div class="pin-icon">
@@ -108,6 +130,9 @@
 
 <div id="toast-container"></div>
 
+<!-- ═══════════════════════════════════════════════════════════
+     TOP BAR
+     ═══════════════════════════════════════════════════════════ -->
 <div class="top-bar" id="topBar">
     <div class="top-bar-left">
         <div class="brand-icon">
@@ -123,6 +148,16 @@
         </div>
     </div>
     <div class="top-bar-right">
+        <button class="icon-btn" id="retro-toggle" aria-label="Retro mode" title="Tết Trung Thu">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v3M12 19v3"/>
+                <ellipse cx="12" cy="11" rx="6" ry="8"/>
+                <path d="M6 11h12"/>
+                <path d="M8 4h8"/>
+                <path d="M8 18h8"/>
+                <circle cx="12" cy="11" r="2" fill="currentColor"/>
+            </svg>
+        </button>
         <button class="icon-btn" id="theme-toggle" aria-label="Theme">
             <svg width="18" height="18"><use href="#i-moon"/></svg>
         </button>
@@ -132,7 +167,12 @@
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN CONTENT
+     ═══════════════════════════════════════════════════════════ -->
 <div class="main-content">
+
+    <!-- ═══════════ PAGE: DASHBOARD ═══════════ -->
     <div id="page-dashboard" class="page-content">
         <div class="card hero-card" id="quick-checkin-card">
             <div class="hero-card-bg"></div>
@@ -254,6 +294,7 @@
         </div>
     </div>
 
+    <!-- ═══════════ PAGE: CALENDAR ═══════════ -->
     <div id="page-calendar" class="page-content hidden">
         <div class="card">
             <div class="card-header">
@@ -345,6 +386,7 @@
         </div>
     </div>
 
+    <!-- ═══════════ PAGE: WORKLOG ═══════════ -->
     <div id="page-worklog" class="page-content hidden">
         <div class="card">
             <div class="card-header">
@@ -436,6 +478,7 @@
         </div>
     </div>
 
+    <!-- ═══════════ PAGE: STATISTICS ═══════════ -->
     <div id="page-statistics" class="page-content hidden">
         <div class="card">
             <div class="card-header">
@@ -488,6 +531,7 @@
         </div>
     </div>
 
+    <!-- ═══════════ PAGE: SETTINGS ═══════════ -->
     <div id="page-settings" class="page-content hidden">
         <div class="card">
             <div class="card-header">
@@ -673,10 +717,13 @@
             </button>
         </div>
         <p id="settings-message" class="mt-10" style="color:var(--success);font-weight:500;"></p>
-        <p class="app-version-footer">TimeTracker v3.3</p>
+        <p class="app-version-footer">TimeTracker v4.2 · Tết Trung Thu Edition</p>
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════
+     FAB + BOTTOM NAV
+     ═══════════════════════════════════════════════════════════ -->
 <button class="fab" id="fab" onclick="fabAction()" aria-label="Quick check-in">
     <svg width="26" height="26"><use href="#i-zap"/></svg>
 </button>
@@ -706,7 +753,9 @@
 
 <div id="confetti-layer"></div>
 
-<!-- ═══ SCRIPTS ═══ -->
+<!-- ═══════════════════════════════════════════════════════════
+     SCRIPTS
+     ═══════════════════════════════════════════════════════════ -->
 <script src="lunar-engine.js?v=2"></script>
 <script src="holiday-data.js?v=2"></script>
 <script src="holiday-resolver.js?v=2"></script>
@@ -714,31 +763,132 @@
 <script src="effects.js?v=2"></script>
 <script src="image-export.js?v=2"></script>
 <script src="script.js?v=2"></script>
-<!-- ═══ SERVICE WORKER — Tự động cập nhật ═══ -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     RETRO TẾT TRUNG THU — Toggle logic
+     ═══════════════════════════════════════════════════════════ -->
 <script>
+(function() {
+    'use strict';
+
+    // ═══ Khởi tạo Retro Mode ═══
+    function initRetroMode() {
+        // Load trạng thái đã lưu (mặc định bật)
+        const retroEnabled = localStorage.getItem('tt_retro_mode') !== 'false';
+        document.body.classList.toggle('retro-mode', retroEnabled);
+
+        // Cập nhật icon
+        updateRetroIcon(retroEnabled);
+
+        // Gắn sự kiện cho nút toggle
+        const btn = document.getElementById('retro-toggle');
+        if (!btn) return;
+
+        btn.addEventListener('click', function(e) {
+            const current = document.body.classList.contains('retro-mode');
+            const newState = !current;
+
+            document.body.classList.toggle('retro-mode', newState);
+            localStorage.setItem('tt_retro_mode', newState);
+            updateRetroIcon(newState);
+
+            // Haptic
+            if (typeof haptic === 'function') haptic();
+
+            // Ripple effect
+            if (window.Effects && window.Effects.ripple) {
+                window.Effects.ripple(btn, e);
+            }
+
+            // Pulse
+            if (window.Effects && window.Effects.pulse) {
+                window.Effects.pulse(btn);
+            }
+
+            // Toast thông báo
+            if (typeof showToast === 'function') {
+                if (newState) {
+                    showToast('🏮 Đã bật Tết Trung Thu!', 'success');
+                } else {
+                    showToast('📱 Đã tắt chế độ Retro', 'info');
+                }
+            }
+
+            // Mini confetti khi bật
+            if (newState && window.Effects && window.Effects.miniConfetti) {
+                const rect = btn.getBoundingClientRect();
+                window.Effects.miniConfetti(
+                    rect.left + rect.width / 2,
+                    rect.top + rect.height / 2
+                );
+            }
+        });
+    }
+
+    // ═══ Cập nhật icon theo trạng thái ═══
+    function updateRetroIcon(isRetro) {
+        const btn = document.getElementById('retro-toggle');
+        if (!btn) return;
+
+        if (isRetro) {
+            // Icon đèn lồng — đang bật retro
+            btn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2v3M12 19v3"/>
+                    <ellipse cx="12" cy="11" rx="6" ry="8"/>
+                    <path d="M6 11h12"/>
+                    <path d="M8 4h8"/>
+                    <path d="M8 18h8"/>
+                    <circle cx="12" cy="11" r="2" fill="currentColor"/>
+                </svg>`;
+            btn.title = 'Đang bật Tết Trung Thu';
+        } else {
+            // Icon trăng — đã tắt retro
+            btn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+                    <circle cx="12" cy="12" r="4"/>
+                </svg>`;
+            btn.title = 'Bật Tết Trung Thu';
+        }
+    }
+
+    // ═══ Khởi động khi DOM sẵn sàng ═══
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initRetroMode);
+    } else {
+        initRetroMode();
+    }
+
+    // Expose để có thể gọi lại từ script.js nếu cần
+    window.initRetroMode = initRetroMode;
+    window.updateRetroIcon = updateRetroIcon;
+})();
+
+// ═══ SERVICE WORKER — Tự động cập nhật ═══
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
             .then(reg => {
                 console.log('✅ SW registered');
-                
+
                 // Kiểm tra update mỗi 5 phút
                 setInterval(() => {
                     reg.update().catch(() => {});
                 }, 5 * 60 * 1000);
-                
+
                 // Kiểm tra khi quay lại tab
                 document.addEventListener('visibilitychange', () => {
                     if (document.visibilityState === 'visible') {
                         reg.update().catch(() => {});
                     }
                 });
-                
+
                 // Khi có SW mới
                 reg.addEventListener('updatefound', () => {
                     const newWorker = reg.installing;
                     console.log('🆕 Có version mới!');
-                    
+
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                             console.log('🔄 Force update...');
@@ -749,7 +899,7 @@ if ('serviceWorker' in navigator) {
                 });
             })
             .catch(err => console.error('❌ SW failed:', err));
-        
+
         // Khi SW đổi → Reload
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -761,5 +911,6 @@ if ('serviceWorker' in navigator) {
     });
 }
 </script>
+
 </body>
 </html>
