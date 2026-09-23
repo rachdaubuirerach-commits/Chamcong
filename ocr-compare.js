@@ -1,9 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════
-   ocr-compare.js — Đối chiếu công HR từ ảnh (v4.5 — DEBUG)
-   - Grayscale + contrast nhẹ (KHÔNG Otsu, KHÔNG nhị phân)
-   - Scale 2x
-   - Parse dựa vào ca làm việc HH:MM~HH:MM
-   - HIỂN THỊ TEXT THÔ ở đầu kết quả để debug
+   ocr-compare.js — Đối chiếu công HR từ ảnh (v4.6 — FIXED)
+   - Đếm times thay vì tìm dấu ~ (vì OCR đọc ~ thành 7)
+   - Bỏ dòng ngày lễ (chỉ có 2 times = ca, không có vào/ra)
+   - Lấy BT/TC đúng vị trí
    ═══════════════════════════════════════════════════════════════ */
 
 const OCRCompare = (function () {
@@ -27,7 +26,7 @@ const OCRCompare = (function () {
         [17 * 60, 23 * 60]
     ];
 
-    // ═══ GIỜ RA HỢP LỆ (nới lỏng) ═══
+    // ═══ GIỜ RA HỢP LỆ ═══
     const VALID_END_MINUTES = [
         [4 * 60, 9 * 60],
         [17 * 60, 21 * 60]
@@ -116,7 +115,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  3. PARSE TEXT OCR
+    //  3. PARSE TEXT OCR (v4.6 — đếm times)
     // ═══════════════════════════════════════════════════════════
     function parseOCRText(text) {
         const lines = text.split('\n');
@@ -135,10 +134,7 @@ const OCRCompare = (function () {
             const d = String(dateMatch[3]).padStart(2, '0');
             const date = `${y}-${mo}-${d}`;
 
-            // Tìm ca "19:30~04:00"
-            const shiftMatch = line.match(/(\d{1,2}):(\d{2})\s*[~\-]\s*(\d{1,2}):(\d{2})/);
-
-            // Lấy tất cả times
+            // ═══ LẤY TẤT CẢ TIMES ═══
             const timeRegex = /(\d{1,2}):(\d{2})/g;
             const allTimes = [];
             let tm;
@@ -146,28 +142,43 @@ const OCRCompare = (function () {
                 allTimes.push(tm[0]);
             }
 
-            // Loại bỏ 2 times của ca khỏi list
-            let timesForActual = allTimes;
+            if (allTimes.length < 2) continue;
+
+            // ═══ PHÂN LOẠI: ĐẾM TIMES ═══
+            // 4+ times → 2 đầu là ca, 2 sau là vào/ra
+            // 2 times  → chỉ là ca (ngày lễ / nghỉ), không có vào/ra
             let shiftStart = null, shiftEnd = null;
-            if (shiftMatch) {
-                shiftStart = normalizeTime(shiftMatch[1] + ':' + shiftMatch[2]);
-                shiftEnd = normalizeTime(shiftMatch[3] + ':' + shiftMatch[4]);
-                const shift1 = shiftMatch[1] + ':' + shiftMatch[2];
-                const shift2 = shiftMatch[3] + ':' + shiftMatch[4];
-                timesForActual = allTimes.filter(t => t !== shift1 && t !== shift2);
+            let timesForActual = [];
+
+            if (allTimes.length >= 4) {
+                shiftStart = allTimes[0];
+                shiftEnd = allTimes[1];
+                timesForActual = allTimes.slice(2);
+            } else if (allTimes.length === 2) {
+                shiftStart = allTimes[0];
+                shiftEnd = allTimes[1];
+                timesForActual = [];
             }
 
-            let actualStart = null, actualEnd = null;
-            if (timesForActual.length >= 2) {
-                actualStart = normalizeTime(timesForActual[0]);
-                actualEnd = normalizeTime(timesForActual[1]);
+            // Không có giờ vào/ra → bỏ dòng (ngày nghỉ/lễ)
+            if (timesForActual.length < 2) {
+                console.log('[OCR] Bỏ dòng không có giờ vào/ra:', date, '(ca:', shiftStart, '~', shiftEnd, ')');
+                continue;
             }
 
-            if (!actualStart || !actualEnd) continue;
+            const actualStart = normalizeTime(timesForActual[0]);
+            const actualEnd = normalizeTime(timesForActual[1]);
 
-            // Lấy BT và TC
-            const afterLastTime = extractNumbersAfterTime(line, timesForActual[timesForActual.length - 1]);
-            const meaningful = afterLastTime.filter(n => n > 0);
+            // ═══ LẤY BT VÀ TC ═══
+            // Sau time vào/ra cuối cùng (timesForActual[1]), các số tiếp theo là BT | TC
+            const lastTimeStr = timesForActual[1];
+            const idx = line.lastIndexOf(lastTimeStr);
+            const tail = idx === -1 ? '' : line.slice(idx + lastTimeStr.length);
+            const numsAfter = [...tail.matchAll(/(\d+(?:[.,]\d+)?)/g)]
+                .map(x => parseFloat(x[1].replace(',', '.')));
+
+            // Lọc bỏ số 0 padding
+            const meaningful = numsAfter.filter(n => n > 0);
 
             let regularHours = 0;
             let overtimeHours = 0;
@@ -197,14 +208,6 @@ const OCRCompare = (function () {
         if (!t) return t;
         const parts = t.split(':');
         return String(parseInt(parts[0], 10)).padStart(2, '0') + ':' + parts[1];
-    }
-
-    function extractNumbersAfterTime(line, timeStr) {
-        const idx = line.lastIndexOf(timeStr);
-        if (idx === -1) return [];
-        const tail = line.slice(idx + timeStr.length);
-        return [...tail.matchAll(/(\d+(?:[.,]\d+)?)/g)]
-            .map(x => parseFloat(x[1].replace(',', '.')));
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -388,7 +391,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  7. HIỂN THỊ KẾT QUẢ (có text thô)
+    //  7. HIỂN THỊ KẾT QUẢ
     // ═══════════════════════════════════════════════════════════
     function renderResults(results, rawText) {
         const el = document.getElementById('ocr-result');
@@ -409,7 +412,6 @@ const OCRCompare = (function () {
                 TC ca đêm ≤ <strong>${TOLERANCE_OT_NIGHT}h</strong>
             </p>
 
-            <!-- ═══ TEXT THÔ (DEBUG) ═══ -->
             <details style="margin-bottom:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:8px;">
                 <summary style="cursor:pointer;font-weight:700;color:#475569;font-size:13px;">
                     🔍 Xem text thô OCR đọc được (${rawText ? rawText.length : 0} ký tự)
@@ -610,7 +612,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  10. HIỂN THỊ TEXT THÔ (khi parse fail)
+    //  10. HIỂN THỊ TEXT THÔ
     // ═══════════════════════════════════════════════════════════
     function renderRawText(text, hrRowsCount) {
         const el = document.getElementById('ocr-result');
@@ -623,9 +625,6 @@ const OCRCompare = (function () {
                     Parse được <strong>${hrRowsCount}</strong> dòng.
                 </div>
                 <textarea readonly style="width:100%;height:220px;font-family:monospace;font-size:11px;padding:8px;border:1px solid #F59E0B;border-radius:6px;background:#FFFBEB;color:#000;box-sizing:border-box;">${escaped}</textarea>
-                <div style="font-size:11px;color:#78350F;margin-top:8px;">
-                    📸 Chụp màn hình này gửi để debug.
-                </div>
             </div>`;
         el.style.display = 'block';
         const clearBtn = document.getElementById('ocr-clear-btn');
