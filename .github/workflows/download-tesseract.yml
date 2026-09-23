@@ -16,28 +16,38 @@ jobs:
 
       - name: Download tesseract.min.js
         run: |
-          curl -L -o tesseract/tesseract.min.js \
+          curl -fL -o tesseract/tesseract.min.js \
             "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"
 
       - name: Download worker.min.js
         run: |
-          curl -L -o tesseract/worker.min.js \
+          curl -fL -o tesseract/worker.min.js \
             "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js"
 
       - name: Download tesseract-core.wasm.js
         run: |
-          curl -L -o tesseract/tesseract-core.wasm.js \
+          curl -fL -o tesseract/tesseract-core.wasm.js \
             "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.0/tesseract-core.wasm.js"
 
       - name: Download vie.traineddata.gz
         run: |
-          curl -L -o tesseract/lang-data/vie.traineddata.gz \
-            "https://cdn.jsdelivr.net/npm/tesseract.js-data@5.0.0/vie/vie.traineddata.gz"
+          curl -fL -o tesseract/lang-data/vie.traineddata.gz \
+            "https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/vie.traineddata.gz"
 
-      - name: Show files
+      - name: Verify file sizes
         run: |
+          echo "=== Checking file sizes ==="
           ls -lah tesseract/
           ls -lah tesseract/lang-data/
+          echo ""
+          echo "=== Verify traineddata is not empty ==="
+          SIZE=$(stat -c%s tesseract/lang-data/vie.traineddata.gz)
+          echo "vie.traineddata.gz size: $SIZE bytes"
+          if [ "$SIZE" -lt 1000000 ]; then
+            echo "❌ ERROR: File too small (< 1MB). Download failed!"
+            exit 1
+          fi
+          echo "✅ File size OK"
 
       - name: Commit and push
         run: |
