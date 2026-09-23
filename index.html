@@ -919,31 +919,6 @@ if ('serviceWorker' in navigator) {
     });
 }
 </script>
-<button onclick="testOCR()" style="position:fixed;top:80px;left:20px;z-index:99999;padding:10px;background:red;color:white;border:none;border-radius:8px;font-weight:bold;">TEST OCR</button>
-<script>
-window.testOCR = async function() {
-    let msg = '';
-    try {
-        msg += 'Tesseract: ' + typeof Tesseract + '\n';
-        msg += 'OCRCompare: ' + typeof OCRCompare + '\n';
-        msg += 'workLogs: ' + (workLogs ? workLogs.length + ' bản ghi' : 'null') + '\n';
-        msg += '---\n';
-        msg += 'Đang test load worker...\n';
-        
-        const w = await Tesseract.createWorker('vie', 1, {
-            workerPath: './tesseract/worker.min.js',
-            corePath: './tesseract/',
-            langPath: './tesseract/lang-data/',
-            logger: (m) => console.log('[TEST]', m.status, m.progress)
-        });
-        msg += '✅ Worker OK!\n';
-        await w.terminate();
-    } catch (e) {
-        msg += '❌ LỖI: ' + (e.message || e.name || String(e)) + '\n';
-        if (e.stack) msg += 'Stack: ' + e.stack.split('\n').slice(0,3).join('\n');
-    }
-    alert(msg);
-};
-</script>
+
 </body>
 </html>
