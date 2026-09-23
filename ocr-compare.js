@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════
    ocr-compare.js — Đối chiếu công HR từ ảnh
-   - Dùng 2 ngôn ngữ: vie + chi_sim (đọc được chữ Hán trong bảng)
-   - Tiền xử lý ảnh nâng cao: scale 3x + Otsu + sharpen
-   - Có log chi tiết khi lỗi
+   - Dùng 2 ngôn ngữ: vie + chi_sim
+   - Tiền xử lý ảnh: scale 3x + Otsu + sharpen
+   - Có debug hiển thị text thô khi parse lỗi
    ═══════════════════════════════════════════════════════════════ */
 
 const OCRCompare = (function () {
@@ -44,7 +44,7 @@ const OCRCompare = (function () {
             }
         });
 
-        // ═══ PSM 6: uniform block of text (tốt cho bảng) ═══
+        // ═══ PSM 6: uniform block of text ═══
         await worker.setParameters({
             tessedit_pageseg_mode: '6',
             preserve_interword_spaces: '1'
@@ -54,7 +54,7 @@ const OCRCompare = (function () {
         return worker;
     }
 
-    // ═══ 2. TIỀN XỬ LÝ ẢNH (nâng cao) ═══
+    // ═══ 2. TIỀN XỬ LÝ ẢNH ═══
     function preprocessImage(file) {
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -73,22 +73,22 @@ const OCRCompare = (function () {
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const data = imageData.data;
 
-                    // Bước 1: Grayscale
+                    // Grayscale
                     for (let i = 0; i < data.length; i += 4) {
                         const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
                         data[i] = data[i + 1] = data[i + 2] = gray;
                     }
 
-                    // Bước 2: Ngưỡng Otsu tự động
+                    // Otsu threshold
                     const threshold = otsuThreshold(data);
 
-                    // Bước 3: Nhị phân hoá
+                    // Nhị phân hoá
                     for (let i = 0; i < data.length; i += 4) {
                         const v = data[i] > threshold ? 255 : 0;
                         data[i] = data[i + 1] = data[i + 2] = v;
                     }
 
-                    // Bước 4: Sharpen nhẹ
+                    // Sharpen
                     sharpenImage(data, canvas.width, canvas.height);
 
                     ctx.putImageData(imageData, 0, 0);
@@ -106,7 +106,6 @@ const OCRCompare = (function () {
         });
     }
 
-    // ═══ Otsu threshold ═══
     function otsuThreshold(data) {
         const hist = new Array(256).fill(0);
         const totalPixels = data.length / 4;
@@ -133,7 +132,6 @@ const OCRCompare = (function () {
         return threshold;
     }
 
-    // ═══ Sharpen nhẹ ═══
     function sharpenImage(data, width, height) {
         const copy = new Uint8ClampedArray(data);
         const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
@@ -394,7 +392,28 @@ const OCRCompare = (function () {
         if (clearBtn) clearBtn.style.display = 'block';
     }
 
-    // ═══ 7. PROGRESS ═══
+    // ═══ 7. HIỂN THỊ TEXT THÔ (DEBUG) ═══
+    function renderRawText(text, hrRowsCount) {
+        const el = document.getElementById('ocr-result');
+        const escaped = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        el.innerHTML = `
+            <div style="background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:14px;">
+                <div style="font-weight:800;color:#92400E;margin-bottom:8px;">⚠️ Không parse được dòng nào</div>
+                <div style="font-size:12px;color:#78350F;margin-bottom:8px;">
+                    Tesseract đọc được <strong>${text ? text.length : 0}</strong> ký tự.
+                    Parse được <strong>${hrRowsCount}</strong> dòng.
+                </div>
+                <textarea readonly style="width:100%;height:220px;font-family:monospace;font-size:11px;padding:8px;border:1px solid #F59E0B;border-radius:6px;background:#FFFBEB;color:#000;box-sizing:border-box;">${escaped}</textarea>
+                <div style="font-size:11px;color:#78350F;margin-top:8px;">
+                    📸 Chụp màn hình này gửi tôi để debug.
+                </div>
+            </div>`;
+        el.style.display = 'block';
+        const clearBtn = document.getElementById('ocr-clear-btn');
+        if (clearBtn) clearBtn.style.display = 'block';
+    }
+
+    // ═══ 8. PROGRESS ═══
     function showProgress() {
         document.getElementById('ocr-progress').style.display = 'block';
         document.getElementById('ocr-result').style.display = 'none';
@@ -412,7 +431,7 @@ const OCRCompare = (function () {
         if (txt) txt.textContent = text;
     }
 
-    // ═══ 8. HÀM CHÍNH ═══
+    // ═══ 9. HÀM CHÍNH ═══
     async function processImage(file) {
         showProgress();
         try {
@@ -429,14 +448,20 @@ const OCRCompare = (function () {
             updateProgress(50, 'Đang đọc ảnh...');
             const result = await w.recognize(processedBlob);
             const text = result.data.text;
-            console.log('[OCR] Text nhận được:', text.substring(0, 300));
+            console.log('[OCR] Text nhận được:', text.substring(0, 500));
 
             updateProgress(85, 'Đang phân tích...');
             const hrRows = parseOCRText(text);
             console.log('[OCR] Số dòng parse được:', hrRows.length);
 
             if (hrRows.length === 0) {
-                throw new Error('Không đọc được dòng nào. Thử ảnh rõ hơn.');
+                // ═══ HIỂN THỊ TEXT THÔ ĐỂ DEBUG ═══
+                hideProgress();
+                renderRawText(text, hrRows.length);
+                if (typeof showToast === 'function') {
+                    showToast('⚠️ Không parse được — xem text thô bên dưới', 'warning');
+                }
+                return;
             }
 
             updateProgress(92, 'Đang so sánh...');
@@ -485,7 +510,7 @@ const OCRCompare = (function () {
         }
     }
 
-    // ═══ 9. XÓA ═══
+    // ═══ 10. XÓA ═══
     function clear() {
         const el = document.getElementById('ocr-result');
         if (el) { el.innerHTML = ''; el.style.display = 'none'; }
@@ -496,7 +521,7 @@ const OCRCompare = (function () {
         lastResults = null;
     }
 
-    // ═══ 10. INIT ═══
+    // ═══ 11. INIT ═══
     function init() {
         const input = document.getElementById('hr-image-input');
         if (!input) return;
