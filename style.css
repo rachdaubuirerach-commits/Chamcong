@@ -1452,3 +1452,115 @@ html.theme-changing * {
     }
     body { background: white; padding: 0; }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   OCR COMPARE — Đối chiếu công HR
+   ═══════════════════════════════════════════════════════════════ */
+
+#ocr-compare-card .card-header .icon {
+    background: linear-gradient(135deg, rgba(16,185,129,0.16), rgba(52,211,153,0.16));
+    color: #10B981;
+}
+
+.ocr-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.ocr-badge {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+.ocr-badge.ok { background: #D1FAE5; color: #065F46; }
+.ocr-badge.diff { background: #FEE2E2; color: #991B1B; }
+.ocr-badge.missing { background: #FEF3C7; color: #92400E; }
+.ocr-badge.skip { background: #E2E8F0; color: #475569; }
+
+[data-theme="dark"] .ocr-badge.ok { background: rgba(16,185,129,0.2); color: #6EE7B7; }
+[data-theme="dark"] .ocr-badge.diff { background: rgba(239,68,68,0.2); color: #FCA5A5; }
+[data-theme="dark"] .ocr-badge.missing { background: rgba(245,158,11,0.2); color: #FCD34D; }
+[data-theme="dark"] .ocr-badge.skip { background: rgba(100,116,139,0.25); color: #CBD5E1; }
+
+.ocr-table {
+    font-size: 12px;
+    width: 100%;
+    border-collapse: collapse;
+}
+.ocr-table th {
+    background: var(--surface-2);
+    padding: 8px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--gray-500);
+    text-align: center;
+    border-bottom: 2px solid var(--border-strong);
+    line-height: 1.2;
+}
+.ocr-table th small {
+    font-size: 9px;
+    color: var(--gray-400);
+    font-weight: 600;
+}
+.ocr-table td {
+    padding: 7px 4px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    font-weight: 600;
+    color: var(--gray-700);
+    font-variant-numeric: tabular-nums;
+}
+.ocr-table td:first-child {
+    text-align: left;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.ocr-table .sep {
+    color: var(--gray-400);
+    margin: 0 2px;
+    font-weight: 400;
+}
+
+.ocr-table tr.row-ok td { background: rgba(16,185,129,0.06); }
+.ocr-table tr.row-diff td { background: rgba(239,68,68,0.08); }
+.ocr-table tr.row-missing td { background: rgba(245,158,11,0.08); }
+.ocr-table tr.row-skip td { opacity: 0.55; }
+
+[data-theme="dark"] .ocr-table tr.row-ok td { background: rgba(16,185,129,0.12); }
+[data-theme="dark"] .ocr-table tr.row-diff td { background: rgba(239,68,68,0.14); }
+[data-theme="dark"] .ocr-table tr.row-missing td { background: rgba(245,158,11,0.14); }
+
+.ocr-table td.cell-diff {
+    color: #DC2626 !important;
+    font-weight: 800 !important;
+    background: rgba(239,68,68,0.15) !important;
+    border-radius: 4px;
+}
+[data-theme="dark"] .ocr-table td.cell-diff {
+    color: #FCA5A5 !important;
+    background: rgba(239,68,68,0.25) !important;
+}
+
+#ocr-progress .progress-bar {
+    background: var(--surface-3);
+    height: 6px;
+    border-radius: 999px;
+    overflow: hidden;
+}
+#ocr-progress .progress-fill {
+    background: linear-gradient(90deg, #10B981, #34D399);
+    height: 100%;
+    transition: width 0.3s ease;
+    border-radius: 999px;
+}
+
+#ocr-clear-btn {
+    font-size: 12px;
+    min-height: 38px;
+    padding: 7px 12px;
+}
