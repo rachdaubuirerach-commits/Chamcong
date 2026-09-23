@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════
-   ocr-compare.js — Đối chiếu công HR từ ảnh (v4.6 — FIXED)
-   - Đếm times thay vì tìm dấu ~ (vì OCR đọc ~ thành 7)
-   - Bỏ dòng ngày lễ (chỉ có 2 times = ca, không có vào/ra)
-   - Lấy BT/TC đúng vị trí
+   ocr-compare.js — Đối chiếu công HR từ ảnh (v4.7 — GỘP DÒNG)
+   - Gộp dòng cùng record trước khi parse
+   - Fix lỗi OCR: "8:75" → "8.75"
+   - Đếm times để xác định ca và giờ vào/ra
    ═══════════════════════════════════════════════════════════════ */
 
 const OCRCompare = (function () {
@@ -74,7 +74,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  2. TIỀN XỬ LÝ ẢNH (nhẹ nhàng)
+    //  2. TIỀN XỬ LÝ ẢNH
     // ═══════════════════════════════════════════════════════════
     function preprocessImage(file) {
         return new Promise((resolve, reject) => {
@@ -115,18 +115,38 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  3. PARSE TEXT OCR (v4.6 — đếm times)
+    //  3. PARSE TEXT OCR (v4.7 — GỘP DÒNG)
     // ═══════════════════════════════════════════════════════════
     function parseOCRText(text) {
         const lines = text.split('\n');
-        const rows = [];
+        const dateRegex = /(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/;
+
+        // ═══ BƯỚC 1: GỘP DÒNG CÙNG RECORD ═══
+        const records = [];
+        let currentRecord = '';
 
         for (const rawLine of lines) {
             const line = rawLine.trim();
             if (!line) continue;
 
-            // Tìm ngày
-            const dateMatch = line.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+            if (dateRegex.test(line)) {
+                // Dòng có ngày → bắt đầu record mới
+                if (currentRecord) records.push(currentRecord);
+                currentRecord = line;
+            } else if (currentRecord) {
+                // Dòng không có ngày → gộp vào record hiện tại
+                currentRecord += ' ' + line;
+            }
+        }
+        if (currentRecord) records.push(currentRecord);
+
+        console.log('[OCR] Gộp được', records.length, 'records');
+
+        // ═══ BƯỚC 2: PARSE TỪNG RECORD ═══
+        const rows = [];
+
+        for (const record of records) {
+            const dateMatch = record.match(dateRegex);
             if (!dateMatch) continue;
 
             const y = dateMatch[1];
@@ -134,19 +154,29 @@ const OCRCompare = (function () {
             const d = String(dateMatch[3]).padStart(2, '0');
             const date = `${y}-${mo}-${d}`;
 
+            // ═══ FIX LỖI OCR: "8:75" → "8.75" ═══
+            // Chỉ fix khi pattern KHÔNG phải giờ hợp lệ
+            const fixedRecord = record.replace(/(\b\d{1,2}):(\d{1,2})\b/g, (match, a, b) => {
+                const h = parseInt(a), m = parseInt(b);
+                // Nếu là giờ hợp lệ (HH 0-23, MM 0-59) → giữ nguyên
+                if (h >= 0 && h <= 23 && m >= 0 && m <= 59) return match;
+                // Ngược lại → đổi thành dấu . (số thập phân)
+                return a + '.' + b;
+            });
+
             // ═══ LẤY TẤT CẢ TIMES ═══
             const timeRegex = /(\d{1,2}):(\d{2})/g;
             const allTimes = [];
             let tm;
-            while ((tm = timeRegex.exec(line)) !== null) {
+            while ((tm = timeRegex.exec(fixedRecord)) !== null) {
                 allTimes.push(tm[0]);
             }
 
             if (allTimes.length < 2) continue;
 
-            // ═══ PHÂN LOẠI: ĐẾM TIMES ═══
+            // ═══ PHÂN LOẠI ═══
             // 4+ times → 2 đầu là ca, 2 sau là vào/ra
-            // 2 times  → chỉ là ca (ngày lễ / nghỉ), không có vào/ra
+            // 2 times  → chỉ là ca (ngày lễ/nghỉ)
             let shiftStart = null, shiftEnd = null;
             let timesForActual = [];
 
@@ -160,9 +190,8 @@ const OCRCompare = (function () {
                 timesForActual = [];
             }
 
-            // Không có giờ vào/ra → bỏ dòng (ngày nghỉ/lễ)
             if (timesForActual.length < 2) {
-                console.log('[OCR] Bỏ dòng không có giờ vào/ra:', date, '(ca:', shiftStart, '~', shiftEnd, ')');
+                console.log('[OCR] Bỏ (chỉ có ca):', date, shiftStart, '~', shiftEnd);
                 continue;
             }
 
@@ -170,14 +199,12 @@ const OCRCompare = (function () {
             const actualEnd = normalizeTime(timesForActual[1]);
 
             // ═══ LẤY BT VÀ TC ═══
-            // Sau time vào/ra cuối cùng (timesForActual[1]), các số tiếp theo là BT | TC
             const lastTimeStr = timesForActual[1];
-            const idx = line.lastIndexOf(lastTimeStr);
-            const tail = idx === -1 ? '' : line.slice(idx + lastTimeStr.length);
+            const idx = fixedRecord.lastIndexOf(lastTimeStr);
+            const tail = idx === -1 ? '' : fixedRecord.slice(idx + lastTimeStr.length);
             const numsAfter = [...tail.matchAll(/(\d+(?:[.,]\d+)?)/g)]
                 .map(x => parseFloat(x[1].replace(',', '.')));
 
-            // Lọc bỏ số 0 padding
             const meaningful = numsAfter.filter(n => n > 0);
 
             let regularHours = 0;
@@ -197,7 +224,7 @@ const OCRCompare = (function () {
                 end: actualEnd,
                 regularHours,
                 overtimeHours,
-                raw: line
+                raw: record
             });
         }
 
@@ -554,6 +581,9 @@ const OCRCompare = (function () {
             updateProgress(85, 'Đang phân tích...');
             const hrRows = parseOCRText(text);
             console.log('[OCR] Parse được:', hrRows.length, 'dòng');
+            if (hrRows.length > 0) {
+                console.log('[OCR] Sample record đầu:', hrRows[0]);
+            }
 
             if (hrRows.length === 0) {
                 hideProgress();
