@@ -29,6 +29,21 @@ jobs:
           curl -fL -o tesseract/tesseract-core.wasm.js \
             "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.0/tesseract-core.wasm.js"
 
+      - name: Download tesseract-core-simd.wasm.js
+        run: |
+          curl -fL -o tesseract/tesseract-core-simd.wasm.js \
+            "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.0/tesseract-core-simd.wasm.js"
+
+      - name: Download tesseract-core-lstm.wasm.js
+        run: |
+          curl -fL -o tesseract/tesseract-core-lstm.wasm.js \
+            "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.0/tesseract-core-lstm.wasm.js"
+
+      - name: Download tesseract-core-simd-lstm.wasm.js
+        run: |
+          curl -fL -o tesseract/tesseract-core-simd-lstm.wasm.js \
+            "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.0/tesseract-core-simd-lstm.wasm.js"
+
       - name: Download vie.traineddata.gz
         run: |
           curl -fL -o tesseract/lang-data/vie.traineddata.gz \
@@ -54,5 +69,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add tesseract/
-          git commit -m "Add Tesseract offline files" || echo "No changes"
+          git commit -m "Add Tesseract core variants" || echo "No changes"
           git push
