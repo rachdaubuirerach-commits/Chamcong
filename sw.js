@@ -1,9 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════
-   sw.js — TimeTracker (Tesseract offline local - vie + chi_sim)
+   sw.js — TimeTracker (Tesseract offline local)
    ═══════════════════════════════════════════════════════════════ */
 
-// ⚠️ ĐỔI SỐ NÀY MỖI LẦN UPDATE
-const CACHE_VERSION = 'v4.3.9';
+const CACHE_VERSION = 'v4.4.0';
 const CACHE_NAME = `timetracker-${CACHE_VERSION}`;
 
 const ASSETS = [
@@ -30,7 +29,6 @@ const ASSETS = [
     './tesseract/lang-data/chi_sim.traineddata.gz'
 ];
 
-// ═══ INSTALL ═══
 self.addEventListener('install', event => {
     console.log('📦 SW Install:', CACHE_VERSION);
     event.waitUntil(
@@ -43,7 +41,6 @@ self.addEventListener('install', event => {
     self.skipWaiting();
 });
 
-// ═══ ACTIVATE ═══
 self.addEventListener('activate', event => {
     console.log('🗑️ SW Activate:', CACHE_VERSION);
     event.waitUntil(
@@ -59,7 +56,6 @@ self.addEventListener('activate', event => {
     );
 });
 
-// ═══ FETCH ═══
 self.addEventListener('fetch', event => {
     if (event.request.method !== 'GET') return;
     const url = new URL(event.request.url);
@@ -78,7 +74,7 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // File nặng (wasm, traineddata, gz): cache first
+    // File nặng: cache first
     const isHeavy = /\.(wasm|traineddata|gz)$/i.test(url.pathname);
     if (isHeavy) {
         event.respondWith(
@@ -108,7 +104,6 @@ self.addEventListener('fetch', event => {
     );
 });
 
-// ═══ MESSAGE ═══
 self.addEventListener('message', event => {
     if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
