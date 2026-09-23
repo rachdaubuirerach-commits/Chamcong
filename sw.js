@@ -2,7 +2,8 @@
    sw.js — TimeTracker (Tesseract offline local)
    ═══════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION = 'v4.3.2';
+// ⚠️ ĐỔI SỐ NÀY MỖI LẦN UPDATE
+const CACHE_VERSION = 'v4.3.3';
 const CACHE_NAME = `timetracker-${CACHE_VERSION}`;
 
 const ASSETS = [
@@ -18,12 +19,17 @@ const ASSETS = [
     './holiday-data.js',
     './holiday-resolver.js',
     './manifest.json',
+    // ═══ Tesseract local ═══
     './tesseract/tesseract.min.js',
     './tesseract/worker.min.js',
     './tesseract/tesseract-core.wasm.js',
+    './tesseract/tesseract-core-simd.wasm.js',
+    './tesseract/tesseract-core-lstm.wasm.js',
+    './tesseract/tesseract-core-simd-lstm.wasm.js',
     './tesseract/lang-data/vie.traineddata.gz'
 ];
 
+// ═══ INSTALL ═══
 self.addEventListener('install', event => {
     console.log('📦 SW Install:', CACHE_VERSION);
     event.waitUntil(
@@ -36,23 +42,29 @@ self.addEventListener('install', event => {
     self.skipWaiting();
 });
 
+// ═══ ACTIVATE ═══
 self.addEventListener('activate', event => {
     console.log('🗑️ SW Activate:', CACHE_VERSION);
     event.waitUntil(
         caches.keys().then(keys => {
             return Promise.all(
                 keys.filter(key => key !== CACHE_NAME)
-                    .map(key => caches.delete(key))
+                    .map(key => {
+                        console.log('🗑️ Delete cache:', key);
+                        return caches.delete(key);
+                    })
             );
         }).then(() => self.clients.claim())
     );
 });
 
+// ═══ FETCH ═══
 self.addEventListener('fetch', event => {
     if (event.request.method !== 'GET') return;
     const url = new URL(event.request.url);
     if (url.origin !== location.origin) return;
 
+    // HTML: network first
     if (event.request.mode === 'navigate' ||
         event.request.destination === 'document') {
         event.respondWith(
@@ -65,6 +77,7 @@ self.addEventListener('fetch', event => {
         return;
     }
 
+    // File nặng (wasm, traineddata, gz): cache first
     const isHeavy = /\.(wasm|traineddata|gz)$/i.test(url.pathname);
     if (isHeavy) {
         event.respondWith(
@@ -82,6 +95,7 @@ self.addEventListener('fetch', event => {
         return;
     }
 
+    // Còn lại: network first
     event.respondWith(
         fetch(event.request).then(response => {
             if (response && response.status === 200) {
@@ -93,6 +107,7 @@ self.addEventListener('fetch', event => {
     );
 });
 
+// ═══ MESSAGE ═══
 self.addEventListener('message', event => {
     if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
