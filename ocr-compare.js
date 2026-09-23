@@ -1,10 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════
-   ocr-compare.js — Đối chiếu công HR từ ảnh (v4.4 — FIXED)
-   - Bỏ Otsu + sharpen (làm hỏng ảnh) → chỉ grayscale + contrast nhẹ
-   - Scale 2x (không phải 3x)
+   ocr-compare.js — Đối chiếu công HR từ ảnh (v4.5 — DEBUG)
+   - Grayscale + contrast nhẹ (KHÔNG Otsu, KHÔNG nhị phân)
+   - Scale 2x
    - Parse dựa vào ca làm việc HH:MM~HH:MM
-   - Validate nghiêm ngặt giờ vào/ra
-   - Lọc dòng rác + fix năm + dedup
+   - HIỂN THỊ TEXT THÔ ở đầu kết quả để debug
    ═══════════════════════════════════════════════════════════════ */
 
 const OCRCompare = (function () {
@@ -23,16 +22,12 @@ const OCRCompare = (function () {
     const MAX_REG_HOURS = 12;
 
     // ═══ GIỜ VÀO HỢP LỆ ═══
-    // Ca sáng: 05:00 - 09:00
-    // Ca đêm: 17:00 - 23:00
     const VALID_START_MINUTES = [
         [5 * 60, 9 * 60],
         [17 * 60, 23 * 60]
     ];
 
     // ═══ GIỜ RA HỢP LỆ (nới lỏng) ═══
-    // Ca đêm: 04:00 - 09:00
-    // Ca sáng: 17:00 - 21:00
     const VALID_END_MINUTES = [
         [4 * 60, 9 * 60],
         [17 * 60, 21 * 60]
@@ -40,6 +35,7 @@ const OCRCompare = (function () {
 
     let worker = null;
     let lastResults = null;
+    let lastRawText = '';
 
     // ═══════════════════════════════════════════════════════════
     //  1. KHỞI TẠO TESSERACT WORKER
@@ -97,17 +93,13 @@ const OCRCompare = (function () {
                 try {
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const data = imageData.data;
-
-                    // Chỉ grayscale + contrast nhẹ (KHÔNG Otsu, KHÔNG nhị phân)
                     const contrast = 1.3;
                     const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
-
                     for (let i = 0; i < data.length; i += 4) {
                         const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
                         const val = Math.max(0, Math.min(255, factor * (gray - 128) + 128));
                         data[i] = data[i + 1] = data[i + 2] = val;
                     }
-
                     ctx.putImageData(imageData, 0, 0);
                 } catch (e) {
                     console.warn('[OCR] Preprocess skip:', e);
@@ -143,14 +135,8 @@ const OCRCompare = (function () {
             const d = String(dateMatch[3]).padStart(2, '0');
             const date = `${y}-${mo}-${d}`;
 
-            // Tìm ca làm việc "19:30~04:00" hoặc "19:30-04:00"
-            const shiftMatch = line.match(/(\d{1,2}):(\d{2})\s*[~\-~]\s*(\d{1,2}):(\d{2})/);
-
-            let shiftStart = null, shiftEnd = null;
-            if (shiftMatch) {
-                shiftStart = normalizeTime(shiftMatch[1] + ':' + shiftMatch[2]);
-                shiftEnd = normalizeTime(shiftMatch[3] + ':' + shiftMatch[4]);
-            }
+            // Tìm ca "19:30~04:00"
+            const shiftMatch = line.match(/(\d{1,2}):(\d{2})\s*[~\-]\s*(\d{1,2}):(\d{2})/);
 
             // Lấy tất cả times
             const timeRegex = /(\d{1,2}):(\d{2})/g;
@@ -160,9 +146,12 @@ const OCRCompare = (function () {
                 allTimes.push(tm[0]);
             }
 
-            // Loại bỏ 2 times của ca khỏi list (nếu có)
+            // Loại bỏ 2 times của ca khỏi list
             let timesForActual = allTimes;
+            let shiftStart = null, shiftEnd = null;
             if (shiftMatch) {
+                shiftStart = normalizeTime(shiftMatch[1] + ':' + shiftMatch[2]);
+                shiftEnd = normalizeTime(shiftMatch[3] + ':' + shiftMatch[4]);
                 const shift1 = shiftMatch[1] + ':' + shiftMatch[2];
                 const shift2 = shiftMatch[3] + ':' + shiftMatch[4];
                 timesForActual = allTimes.filter(t => t !== shift1 && t !== shift2);
@@ -176,7 +165,7 @@ const OCRCompare = (function () {
 
             if (!actualStart || !actualEnd) continue;
 
-            // Lấy BT và TC — bỏ các số 0 padding
+            // Lấy BT và TC
             const afterLastTime = extractNumbersAfterTime(line, timesForActual[timesForActual.length - 1]);
             const meaningful = afterLastTime.filter(n => n > 0);
 
@@ -264,7 +253,6 @@ const OCRCompare = (function () {
         const filtered = [];
 
         for (const r of rows) {
-            // Fix năm sai
             const y = parseInt(r.date.substring(0, 4));
             if (Math.abs(y - currentYear) > VALID_YEAR_RANGE) {
                 const oldDate = r.date;
@@ -272,7 +260,6 @@ const OCRCompare = (function () {
                 console.log('[OCR] Fix năm:', oldDate, '→', r.date);
             }
 
-            // Lọc BT/TC bất thường
             const bt = r.regularHours || 0;
             const ot = r.overtimeHours || 0;
 
@@ -285,7 +272,6 @@ const OCRCompare = (function () {
                 continue;
             }
 
-            // Validate giờ vào
             const startMin = timeToMinutes(r.start);
             if (startMin === null) {
                 console.warn('[OCR] Bỏ giờ vào null:', r.date);
@@ -296,7 +282,6 @@ const OCRCompare = (function () {
                 continue;
             }
 
-            // Validate giờ ra
             const endMin = timeToMinutes(r.end);
             if (endMin === null) {
                 console.warn('[OCR] Bỏ giờ ra null:', r.date);
@@ -307,7 +292,6 @@ const OCRCompare = (function () {
                 continue;
             }
 
-            // Validate quan hệ vào-ra
             const isNight = isNightShift(r.start);
             if (isNight) {
                 if (startMin < endMin && (endMin - startMin) < 8 * 60) {
@@ -324,7 +308,6 @@ const OCRCompare = (function () {
             filtered.push(r);
         }
 
-        // Dedup theo ngày
         const byDate = {};
         for (const r of filtered) {
             if (!byDate[r.date]) {
@@ -405,9 +388,9 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  7. HIỂN THỊ
+    //  7. HIỂN THỊ KẾT QUẢ (có text thô)
     // ═══════════════════════════════════════════════════════════
-    function renderResults(results) {
+    function renderResults(results, rawText) {
         const el = document.getElementById('ocr-result');
         const ok = results.filter(r => r.status === 'ok').length;
         const diff = results.filter(r => r.status === 'diff').length;
@@ -425,6 +408,15 @@ const OCRCompare = (function () {
                 TC ca ngày ≤ <strong>${TOLERANCE_OT_DAY}h</strong> ·
                 TC ca đêm ≤ <strong>${TOLERANCE_OT_NIGHT}h</strong>
             </p>
+
+            <!-- ═══ TEXT THÔ (DEBUG) ═══ -->
+            <details style="margin-bottom:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:8px;">
+                <summary style="cursor:pointer;font-weight:700;color:#475569;font-size:13px;">
+                    🔍 Xem text thô OCR đọc được (${rawText ? rawText.length : 0} ký tự)
+                </summary>
+                <textarea readonly style="width:100%;height:200px;font-family:monospace;font-size:10px;padding:8px;margin-top:8px;border:1px solid #CBD5E1;border-radius:6px;background:#FFF;color:#000;box-sizing:border-box;">${(rawText || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+            </details>
+
             <div class="ocr-cards">`;
 
         for (const r of results) {
@@ -517,30 +509,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  8. HIỂN THỊ TEXT THÔ (DEBUG)
-    // ═══════════════════════════════════════════════════════════
-    function renderRawText(text, hrRowsCount) {
-        const el = document.getElementById('ocr-result');
-        const escaped = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        el.innerHTML = `
-            <div style="background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:14px;">
-                <div style="font-weight:800;color:#92400E;margin-bottom:8px;">⚠️ Không parse được dòng nào</div>
-                <div style="font-size:12px;color:#78350F;margin-bottom:8px;">
-                    Tesseract đọc được <strong>${text ? text.length : 0}</strong> ký tự.
-                    Parse được <strong>${hrRowsCount}</strong> dòng.
-                </div>
-                <textarea readonly style="width:100%;height:220px;font-family:monospace;font-size:11px;padding:8px;border:1px solid #F59E0B;border-radius:6px;background:#FFFBEB;color:#000;box-sizing:border-box;">${escaped}</textarea>
-                <div style="font-size:11px;color:#78350F;margin-top:8px;">
-                    📸 Chụp màn hình này gửi để debug.
-                </div>
-            </div>`;
-        el.style.display = 'block';
-        const clearBtn = document.getElementById('ocr-clear-btn');
-        if (clearBtn) clearBtn.style.display = 'block';
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  9. PROGRESS
+    //  8. PROGRESS
     // ═══════════════════════════════════════════════════════════
     function showProgress() {
         document.getElementById('ocr-progress').style.display = 'block';
@@ -560,7 +529,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  10. HÀM CHÍNH
+    //  9. HÀM CHÍNH
     // ═══════════════════════════════════════════════════════════
     async function processImage(file) {
         showProgress();
@@ -577,7 +546,8 @@ const OCRCompare = (function () {
             updateProgress(50, 'Đang đọc ảnh...');
             const result = await w.recognize(processedBlob);
             const text = result.data.text;
-            console.log('[OCR] Text (300 ký tự đầu):', text.substring(0, 300));
+            lastRawText = text;
+            console.log('[OCR] Text đầy đủ:\n', text);
 
             updateProgress(85, 'Đang phân tích...');
             const hrRows = parseOCRText(text);
@@ -601,7 +571,7 @@ const OCRCompare = (function () {
             }
 
             updateProgress(100, 'Hoàn tất!');
-            renderResults(results);
+            renderResults(results, text);
             lastResults = results;
 
             const okCount = results.filter(r => r.status === 'ok').length;
@@ -640,6 +610,29 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
+    //  10. HIỂN THỊ TEXT THÔ (khi parse fail)
+    // ═══════════════════════════════════════════════════════════
+    function renderRawText(text, hrRowsCount) {
+        const el = document.getElementById('ocr-result');
+        const escaped = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        el.innerHTML = `
+            <div style="background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:14px;">
+                <div style="font-weight:800;color:#92400E;margin-bottom:8px;">⚠️ Không parse được dòng nào</div>
+                <div style="font-size:12px;color:#78350F;margin-bottom:8px;">
+                    Tesseract đọc được <strong>${text ? text.length : 0}</strong> ký tự.
+                    Parse được <strong>${hrRowsCount}</strong> dòng.
+                </div>
+                <textarea readonly style="width:100%;height:220px;font-family:monospace;font-size:11px;padding:8px;border:1px solid #F59E0B;border-radius:6px;background:#FFFBEB;color:#000;box-sizing:border-box;">${escaped}</textarea>
+                <div style="font-size:11px;color:#78350F;margin-top:8px;">
+                    📸 Chụp màn hình này gửi để debug.
+                </div>
+            </div>`;
+        el.style.display = 'block';
+        const clearBtn = document.getElementById('ocr-clear-btn');
+        if (clearBtn) clearBtn.style.display = 'block';
+    }
+
+    // ═══════════════════════════════════════════════════════════
     //  11. XÓA
     // ═══════════════════════════════════════════════════════════
     function clear() {
@@ -650,6 +643,7 @@ const OCRCompare = (function () {
         const input = document.getElementById('hr-image-input');
         if (input) input.value = '';
         lastResults = null;
+        lastRawText = '';
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -668,5 +662,5 @@ const OCRCompare = (function () {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
 
-    return { processImage, clear, getLastResults: () => lastResults };
+    return { processImage, clear, getLastResults: () => lastResults, getRawText: () => lastRawText };
 })();
