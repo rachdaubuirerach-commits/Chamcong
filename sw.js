@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   sw.js — TimeTracker (Tesseract offline local)
+   sw.js — TimeTracker (Tesseract offline local - vie + chi_sim)
    ═══════════════════════════════════════════════════════════════ */
 
 // ⚠️ ĐỔI SỐ NÀY MỖI LẦN UPDATE
@@ -26,7 +26,8 @@ const ASSETS = [
     './tesseract/tesseract-core-simd.wasm.js',
     './tesseract/tesseract-core-lstm.wasm.js',
     './tesseract/tesseract-core-simd-lstm.wasm.js',
-    './tesseract/lang-data/vie.traineddata.gz'
+    './tesseract/lang-data/vie.traineddata.gz',
+    './tesseract/lang-data/chi_sim.traineddata.gz'
 ];
 
 // ═══ INSTALL ═══

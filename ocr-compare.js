@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
    ocr-compare.js — Đối chiếu công HR từ ảnh
-   - Scale 3x + nhị phân hoá + sharpen
-   - PSM 4 (single column of text)
+   - Dùng 2 ngôn ngữ: vie + chi_sim (đọc được chữ Hán trong bảng)
+   - Tiền xử lý ảnh nâng cao: scale 3x + Otsu + sharpen
    - Có log chi tiết khi lỗi
    ═══════════════════════════════════════════════════════════════ */
 
@@ -16,7 +16,7 @@ const OCRCompare = (function () {
     let worker = null;
     let lastResults = null;
 
-    // ═══ 1. KHỞI TẠO TESSERACT WORKER (LOCAL) ═══
+    // ═══ 1. KHỞI TẠO TESSERACT WORKER (vie + chi_sim) ═══
     async function initWorker() {
         if (worker) return worker;
 
@@ -24,16 +24,18 @@ const OCRCompare = (function () {
             throw new Error('Tesseract undefined. Kiểm tra file tesseract/tesseract.min.js. URL: ' + location.origin + '/tesseract/tesseract.min.js');
         }
 
-        console.log('[OCR] Bắt đầu tạo worker...');
-        worker = await Tesseract.createWorker('vie', 1, {
+        console.log('[OCR] Bắt đầu tạo worker (vie + chi_sim)...');
+
+        worker = await Tesseract.createWorker(['vie', 'chi_sim'], 1, {
             workerPath: './tesseract/worker.min.js',
             corePath: './tesseract/',
             langPath: './tesseract/lang-data/',
             logger: (m) => {
+                console.log('[OCR]', m.status, m.progress ? Math.round(m.progress * 100) + '%' : '');
                 if (m.status === 'recognizing text') {
                     updateProgress(50 + m.progress * 35, 'Đang đọc ảnh... ' + Math.round(m.progress * 100) + '%');
                 } else if (m.status === 'loading language traineddata') {
-                    updateProgress(15, 'Đang tải dữ liệu tiếng Việt...');
+                    updateProgress(15, 'Đang tải dữ liệu ngôn ngữ...');
                 } else if (m.status === 'initializing api') {
                     updateProgress(30, 'Đang khởi tạo OCR...');
                 } else if (m.status === 'loading tesseract core') {
@@ -42,12 +44,10 @@ const OCRCompare = (function () {
             }
         });
 
-        // ═══ PSM 4: single column of text (tốt cho bảng có cột) ═══
+        // ═══ PSM 6: uniform block of text (tốt cho bảng) ═══
         await worker.setParameters({
-            tessedit_pageseg_mode: '4',
-            preserve_interword_spaces: '1',
-            // Whitelist chỉ cho phép chữ số và ký tự cần thiết
-            tessedit_char_whitelist: '0123456789:- .'
+            tessedit_pageseg_mode: '6',
+            preserve_interword_spaces: '1'
         });
 
         console.log('[OCR] Worker sẵn sàng');
@@ -60,13 +60,11 @@ const OCRCompare = (function () {
             const img = new Image();
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                // ═══ Scale 3x (thay vì 2x) ═══
                 const scale = 3;
                 canvas.width = img.width * scale;
                 canvas.height = img.height * scale;
                 const ctx = canvas.getContext('2d');
 
-                // Vẽ ảnh với smoothing cao
                 ctx.imageSmoothingEnabled = true;
                 ctx.imageSmoothingQuality = 'high';
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -75,23 +73,22 @@ const OCRCompare = (function () {
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const data = imageData.data;
 
-                    // ═══ Bước 1: Grayscale + tăng contrast ═══
+                    // Bước 1: Grayscale
                     for (let i = 0; i < data.length; i += 4) {
                         const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
                         data[i] = data[i + 1] = data[i + 2] = gray;
                     }
 
-                    // ═══ Bước 2: Tính ngưỡng Otsu tự động ═══
+                    // Bước 2: Ngưỡng Otsu tự động
                     const threshold = otsuThreshold(data);
 
-                    // ═══ Bước 3: Nhị phân hoá (threshold) ═══
-                    // Pixel > threshold → trắng (255), ngược lại → đen (0)
+                    // Bước 3: Nhị phân hoá
                     for (let i = 0; i < data.length; i += 4) {
                         const v = data[i] > threshold ? 255 : 0;
                         data[i] = data[i + 1] = data[i + 2] = v;
                     }
 
-                    // ═══ Bước 4: Sharpen nhẹ (làm nét chữ số) ═══
+                    // Bước 4: Sharpen nhẹ
                     sharpenImage(data, canvas.width, canvas.height);
 
                     ctx.putImageData(imageData, 0, 0);
@@ -109,17 +106,15 @@ const OCRCompare = (function () {
         });
     }
 
-    // ═══ Otsu threshold — tự tìm ngưỡng tối ưu ═══
+    // ═══ Otsu threshold ═══
     function otsuThreshold(data) {
         const hist = new Array(256).fill(0);
         const totalPixels = data.length / 4;
         for (let i = 0; i < data.length; i += 4) {
             hist[data[i]]++;
         }
-
         let sum = 0;
         for (let i = 0; i < 256; i++) sum += i * hist[i];
-
         let sumB = 0, wB = 0, maxVar = 0, threshold = 128;
         for (let t = 0; t < 256; t++) {
             wB += hist[t];
@@ -135,24 +130,21 @@ const OCRCompare = (function () {
                 threshold = t;
             }
         }
-        console.log('[OCR] Ngưỡng Otsu:', threshold);
         return threshold;
     }
 
-    // ═══ Sharpen nhẹ (kernel 3x3) ═══
+    // ═══ Sharpen nhẹ ═══
     function sharpenImage(data, width, height) {
         const copy = new Uint8ClampedArray(data);
-        const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0]; // sharpen nhẹ
-        const kSize = 3;
+        const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
         const half = 1;
-
         for (let y = half; y < height - half; y++) {
             for (let x = half; x < width - half; x++) {
                 let sum = 0;
                 for (let ky = -half; ky <= half; ky++) {
                     for (let kx = -half; kx <= half; kx++) {
                         const px = (y + ky) * width + (x + kx);
-                        const kIdx = (ky + half) * kSize + (kx + half);
+                        const kIdx = (ky + half) * 3 + (kx + half);
                         sum += copy[px * 4] * kernel[kIdx];
                     }
                 }
@@ -292,7 +284,7 @@ const OCRCompare = (function () {
         return results;
     }
 
-    // ═══ 6. HIỂN THỊ DẠNG THẺ ═══
+    // ═══ 6. HIỂN THỊ ═══
     function renderResults(results) {
         const el = document.getElementById('ocr-result');
         const ok = results.filter(r => r.status === 'ok').length;
@@ -465,7 +457,6 @@ const OCRCompare = (function () {
         } catch (err) {
             hideProgress();
             console.error('[OCR] LỖI:', err);
-
             let msg = 'Lỗi không xác định';
             if (err) {
                 if (err.message) msg = err.message;
@@ -476,13 +467,11 @@ const OCRCompare = (function () {
                 }
             }
             const stack = (err && err.stack) ? err.stack.split('\n').slice(0, 2).join(' → ') : '';
-
             if (typeof showToast === 'function') {
                 showToast('❌ ' + msg, 'danger');
             } else {
                 alert('Lỗi OCR: ' + msg);
             }
-
             const el = document.getElementById('ocr-result');
             if (el) {
                 el.innerHTML = `
