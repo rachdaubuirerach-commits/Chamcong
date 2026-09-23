@@ -1,8 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════
-   ocr-compare.js — Đối chiếu công HR từ ảnh (FULLY FIXED)
-   - Hiểu layout bảng HR: mã NV | tên | bộ phận | ngày | loại | ca | giờ ca | vào | ra | BT | TC
-   - Lọc dòng rác, fix năm, dedup theo ngày
-   - So sánh: ngày, giờ vào, giờ ra, giờ BT, tăng ca, loại ngày
+   ocr-compare.js — Đối chiếu công HR từ ảnh (v4.4 — FIXED)
+   - Bỏ Otsu + sharpen (làm hỏng ảnh) → chỉ grayscale + contrast nhẹ
+   - Scale 2x (không phải 3x)
+   - Parse dựa vào ca làm việc HH:MM~HH:MM
+   - Validate nghiêm ngặt giờ vào/ra
+   - Lọc dòng rác + fix năm + dedup
    ═══════════════════════════════════════════════════════════════ */
 
 const OCRCompare = (function () {
@@ -15,25 +17,25 @@ const OCRCompare = (function () {
     const TOLERANCE_OT_NIGHT = 0.5;
 
     // ═══ GIỚI HẠN HỢP LỆ ═══
-    const VALID_YEAR_RANGE = 2;           // năm trong khoảng currentYear ± 2
-    const MAX_OT_HOURS = 8;               // tăng ca tối đa 8h/ngày
-    const MIN_REG_HOURS = 5;              // giờ BT tối thiểu
-    const MAX_REG_HOURS = 12;             // giờ BT tối đa
+    const VALID_YEAR_RANGE = 2;
+    const MAX_OT_HOURS = 8;
+    const MIN_REG_HOURS = 5;
+    const MAX_REG_HOURS = 12;
 
     // ═══ GIỜ VÀO HỢP LỆ ═══
     // Ca sáng: 05:00 - 09:00
     // Ca đêm: 17:00 - 23:00
     const VALID_START_MINUTES = [
-        [5 * 60, 9 * 60],      // ca sáng
-        [17 * 60, 23 * 60]     // ca đêm
+        [5 * 60, 9 * 60],
+        [17 * 60, 23 * 60]
     ];
 
-    // ═══ GIỜ RA HỢP LỆ ═══
-    // Ca sáng: 17:00 - 21:00
+    // ═══ GIỜ RA HỢP LỆ (nới lỏng) ═══
     // Ca đêm: 04:00 - 09:00
+    // Ca sáng: 17:00 - 21:00
     const VALID_END_MINUTES = [
-        [17 * 60, 21 * 60],    // ca sáng
-        [4 * 60, 9 * 60]       // ca đêm
+        [4 * 60, 9 * 60],
+        [17 * 60, 21 * 60]
     ];
 
     let worker = null;
@@ -77,14 +79,14 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  2. TIỀN XỬ LÝ ẢNH
+    //  2. TIỀN XỬ LÝ ẢNH (nhẹ nhàng)
     // ═══════════════════════════════════════════════════════════
     function preprocessImage(file) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                const scale = 3;
+                const scale = 2;
                 canvas.width = img.width * scale;
                 canvas.height = img.height * scale;
                 const ctx = canvas.getContext('2d');
@@ -96,23 +98,15 @@ const OCRCompare = (function () {
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const data = imageData.data;
 
-                    // Grayscale
+                    // Chỉ grayscale + contrast nhẹ (KHÔNG Otsu, KHÔNG nhị phân)
+                    const contrast = 1.3;
+                    const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+
                     for (let i = 0; i < data.length; i += 4) {
                         const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                        data[i] = data[i + 1] = data[i + 2] = gray;
+                        const val = Math.max(0, Math.min(255, factor * (gray - 128) + 128));
+                        data[i] = data[i + 1] = data[i + 2] = val;
                     }
-
-                    // Otsu threshold
-                    const threshold = otsuThreshold(data);
-
-                    // Nhị phân hoá
-                    for (let i = 0; i < data.length; i += 4) {
-                        const v = data[i] > threshold ? 255 : 0;
-                        data[i] = data[i + 1] = data[i + 2] = v;
-                    }
-
-                    // Sharpen
-                    sharpenImage(data, canvas.width, canvas.height);
 
                     ctx.putImageData(imageData, 0, 0);
                 } catch (e) {
@@ -129,60 +123,9 @@ const OCRCompare = (function () {
         });
     }
 
-    function otsuThreshold(data) {
-        const hist = new Array(256).fill(0);
-        const totalPixels = data.length / 4;
-        for (let i = 0; i < data.length; i += 4) hist[data[i]]++;
-        let sum = 0;
-        for (let i = 0; i < 256; i++) sum += i * hist[i];
-        let sumB = 0, wB = 0, maxVar = 0, threshold = 128;
-        for (let t = 0; t < 256; t++) {
-            wB += hist[t];
-            if (wB === 0) continue;
-            const wF = totalPixels - wB;
-            if (wF === 0) break;
-            sumB += t * hist[t];
-            const mB = sumB / wB;
-            const mF = (sum - sumB) / wF;
-            const between = wB * wF * (mB - mF) * (mB - mF);
-            if (between > maxVar) { maxVar = between; threshold = t; }
-        }
-        return threshold;
-    }
-
-    function sharpenImage(data, width, height) {
-        const copy = new Uint8ClampedArray(data);
-        const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
-        const half = 1;
-        for (let y = half; y < height - half; y++) {
-            for (let x = half; x < width - half; x++) {
-                let sum = 0;
-                for (let ky = -half; ky <= half; ky++) {
-                    for (let kx = -half; kx <= half; kx++) {
-                        const px = (y + ky) * width + (x + kx);
-                        const kIdx = (ky + half) * 3 + (kx + half);
-                        sum += copy[px * 4] * kernel[kIdx];
-                    }
-                }
-                const idx = (y * width + x) * 4;
-                const v = Math.max(0, Math.min(255, sum));
-                data[idx] = data[idx + 1] = data[idx + 2] = v;
-            }
-        }
-    }
-
     // ═══════════════════════════════════════════════════════════
-    //  3. PARSE TEXT OCR — HIỂU LAYOUT BẢNG HR
+    //  3. PARSE TEXT OCR
     // ═══════════════════════════════════════════════════════════
-    // Layout bảng HR (từ ảnh):
-    // Mã NV | Tên | Bộ phận | Ngày | Loại | Ca | Giờ ca | Vào | Ra | BT | TC | ...
-    // VN010722 | Lê Văn Phúc | IPQC | 2026-09-03 | 节假日 | 【越南】产线夜班 | 19:30~04:00 | 19:23 | 07:32 | 8 | 3.75 | ...
-    //
-    // Sau khi OCR, mỗi dòng text có dạng:
-    // "VN010722 Lê Văn Phúc IPQC 2026-09-03 节假日 【越南】产线夜班 19:30~04:00 19:23 07:32 8 3.75 0 0 0 0"
-    //
-    // Cần lấy: ngày | giờ vào (sau dấu ~) | giờ ra | BT | TC
-
     function parseOCRText(text) {
         const lines = text.split('\n');
         const rows = [];
@@ -200,8 +143,7 @@ const OCRCompare = (function () {
             const d = String(dateMatch[3]).padStart(2, '0');
             const date = `${y}-${mo}-${d}`;
 
-            // Tìm ca làm việc có dạng "19:30~04:00" hoặc "19:30-04:00"
-            // Pattern: HH:MM ~ HH:MM
+            // Tìm ca làm việc "19:30~04:00" hoặc "19:30-04:00"
             const shiftMatch = line.match(/(\d{1,2}):(\d{2})\s*[~\-~]\s*(\d{1,2}):(\d{2})/);
 
             let shiftStart = null, shiftEnd = null;
@@ -210,7 +152,7 @@ const OCRCompare = (function () {
                 shiftEnd = normalizeTime(shiftMatch[3] + ':' + shiftMatch[4]);
             }
 
-            // Lấy TẤT CẢ times trong dòng
+            // Lấy tất cả times
             const timeRegex = /(\d{1,2}):(\d{2})/g;
             const allTimes = [];
             let tm;
@@ -218,19 +160,15 @@ const OCRCompare = (function () {
                 allTimes.push(tm[0]);
             }
 
-            // ═══ GIỜ VÀO/RA THỰC TẾ ═══
-            // Sau khi loại ca làm việc (2 times đầu nếu có shiftMatch) → 2 times tiếp theo là vào/ra
-            let actualStart = null, actualEnd = null;
+            // Loại bỏ 2 times của ca khỏi list (nếu có)
             let timesForActual = allTimes;
-
             if (shiftMatch) {
-                // Bỏ 2 times của ca khỏi list
-                timesForActual = allTimes.filter(t =>
-                    t !== shiftMatch[1] + ':' + shiftMatch[2] &&
-                    t !== shiftMatch[3] + ':' + shiftMatch[4]
-                );
+                const shift1 = shiftMatch[1] + ':' + shiftMatch[2];
+                const shift2 = shiftMatch[3] + ':' + shiftMatch[4];
+                timesForActual = allTimes.filter(t => t !== shift1 && t !== shift2);
             }
 
+            let actualStart = null, actualEnd = null;
             if (timesForActual.length >= 2) {
                 actualStart = normalizeTime(timesForActual[0]);
                 actualEnd = normalizeTime(timesForActual[1]);
@@ -238,16 +176,12 @@ const OCRCompare = (function () {
 
             if (!actualStart || !actualEnd) continue;
 
-            // ═══ LẤY BT VÀ TC ═══
-            // Sau time cuối cùng, các số tiếp theo là: BT | TC | (các cột 0 padding)
+            // Lấy BT và TC — bỏ các số 0 padding
             const afterLastTime = extractNumbersAfterTime(line, timesForActual[timesForActual.length - 1]);
+            const meaningful = afterLastTime.filter(n => n > 0);
 
             let regularHours = 0;
             let overtimeHours = 0;
-
-            // Lọc bỏ các số 0 padding ở cuối
-            const meaningful = afterLastTime.filter(n => n > 0);
-
             if (meaningful.length >= 2) {
                 regularHours = meaningful[0];
                 overtimeHours = meaningful[1];
@@ -323,14 +257,14 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  5. CLEAN HR ROWS — LỌC DÒNG RÁC
+    //  5. CLEAN HR ROWS
     // ═══════════════════════════════════════════════════════════
     function cleanHrRows(rows) {
         const currentYear = new Date().getFullYear();
         const filtered = [];
 
         for (const r of rows) {
-            // ═══ FIX NĂM SAI ═══
+            // Fix năm sai
             const y = parseInt(r.date.substring(0, 4));
             if (Math.abs(y - currentYear) > VALID_YEAR_RANGE) {
                 const oldDate = r.date;
@@ -338,61 +272,51 @@ const OCRCompare = (function () {
                 console.log('[OCR] Fix năm:', oldDate, '→', r.date);
             }
 
-            // ═══ LỌC BT/TC BẤT THƯỜNG ═══
+            // Lọc BT/TC bất thường
             const bt = r.regularHours || 0;
             const ot = r.overtimeHours || 0;
 
             if (ot > MAX_OT_HOURS) {
-                console.warn('[OCR] Bỏ dòng TC quá lớn:', r.date, 'TC =', ot);
+                console.warn('[OCR] Bỏ TC quá lớn:', r.date, 'TC =', ot);
                 continue;
             }
-
-            // Cho phép BT = 0 (ngày nghỉ / lễ)
             if (bt !== 0 && (bt < MIN_REG_HOURS || bt > MAX_REG_HOURS)) {
-                console.warn('[OCR] Bỏ dòng BT bất thường:', r.date, 'BT =', bt);
+                console.warn('[OCR] Bỏ BT bất thường:', r.date, 'BT =', bt);
                 continue;
             }
 
-            // ═══ VALIDATE GIỜ VÀO ═══
+            // Validate giờ vào
             const startMin = timeToMinutes(r.start);
             if (startMin === null) {
-                console.warn('[OCR] Bỏ dòng giờ vào không hợp lệ:', r.date, r.start);
+                console.warn('[OCR] Bỏ giờ vào null:', r.date);
                 continue;
             }
-
-            // Giờ vào phải nằm trong khoảng hợp lệ
             if (!isTimeInRanges(startMin, VALID_START_MINUTES)) {
-                console.warn('[OCR] Bỏ dòng giờ vào bất thường:', r.date, 'start =', r.start);
+                console.warn('[OCR] Bỏ giờ vào bất thường:', r.date, r.start);
                 continue;
             }
 
-            // ═══ VALIDATE GIỜ RA ═══
+            // Validate giờ ra
             const endMin = timeToMinutes(r.end);
             if (endMin === null) {
-                console.warn('[OCR] Bỏ dòng giờ ra không hợp lệ:', r.date, r.end);
+                console.warn('[OCR] Bỏ giờ ra null:', r.date);
                 continue;
             }
-
             if (!isTimeInRanges(endMin, VALID_END_MINUTES)) {
-                console.warn('[OCR] Bỏ dòng giờ ra bất thường:', r.date, 'end =', r.end);
+                console.warn('[OCR] Bỏ giờ ra bất thường:', r.date, r.end);
                 continue;
             }
 
-            // ═══ VALIDATE QUAN HỆ VÀO-RA ═══
-            // Ca đêm: vào > ra (qua ngày)
-            // Ca sáng: vào < ra (cùng ngày)
+            // Validate quan hệ vào-ra
             const isNight = isNightShift(r.start);
             if (isNight) {
-                // Vào 19:30, ra 07:30 → startMin > endMin
                 if (startMin < endMin && (endMin - startMin) < 8 * 60) {
-                    // Có thể là ca sáng nhưng start > 17h → loại
-                    console.warn('[OCR] Bỏ dòng ca đêm bất thường:', r.date);
+                    console.warn('[OCR] Bỏ ca đêm bất thường:', r.date);
                     continue;
                 }
             } else {
-                // Vào 07:30, ra 19:30 → startMin < endMin
                 if (startMin > endMin) {
-                    console.warn('[OCR] Bỏ dòng ca ngày bất thường:', r.date);
+                    console.warn('[OCR] Bỏ ca ngày bất thường:', r.date);
                     continue;
                 }
             }
@@ -400,7 +324,7 @@ const OCRCompare = (function () {
             filtered.push(r);
         }
 
-        // ═══ DEDUP THEO NGÀY ═══
+        // Dedup theo ngày
         const byDate = {};
         for (const r of filtered) {
             if (!byDate[r.date]) {
@@ -426,7 +350,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  6. SO SÁNH VỚI APP
+    //  6. SO SÁNH
     // ═══════════════════════════════════════════════════════════
     function compareWithApp(hrRows, workLogs) {
         const cleanedRows = cleanHrRows(hrRows);
@@ -440,7 +364,7 @@ const OCRCompare = (function () {
             if (!appLog) {
                 results.push({
                     date: hr.date, hr, hrIsSunday, appLog: null,
-                    status: 'missing', message: 'App chưa chấm công ngày này'
+                    status: 'missing', message: 'App chưa chấm công'
                 });
                 continue;
             }
@@ -658,9 +582,6 @@ const OCRCompare = (function () {
             updateProgress(85, 'Đang phân tích...');
             const hrRows = parseOCRText(text);
             console.log('[OCR] Parse được:', hrRows.length, 'dòng');
-            if (hrRows.length > 0) {
-                console.log('[OCR] Sample dòng đầu:', hrRows[0]);
-            }
 
             if (hrRows.length === 0) {
                 hideProgress();
