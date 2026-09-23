@@ -2,8 +2,7 @@
    ocr-compare.js — Đối chiếu công HR từ ảnh
    - Dùng Tesseract LOCAL (không cần CDN)
    - Chỉ dùng tiếng Việt
-   - Ngưỡng: giờ vào/ra ±15p, giờ BT ±0.25h,
-     tăng ca ±0.25h (ngày) / ±0.5h (đêm)
+   - Có log chi tiết khi lỗi
    ═══════════════════════════════════════════════════════════════ */
 
 const OCRCompare = (function () {
@@ -20,14 +19,22 @@ const OCRCompare = (function () {
     // ═══ 1. KHỞI TẠO TESSERACT WORKER (LOCAL) ═══
     async function initWorker() {
         if (worker) return worker;
+
         if (typeof Tesseract === 'undefined') {
-            throw new Error('Tesseract.js chưa tải. Kiểm tra file tesseract/tesseract.min.js.');
+            throw new Error('Tesseract undefined. Kiểm tra file tesseract/tesseract.min.js có tồn tại không. URL: ' + location.origin + '/tesseract/tesseract.min.js');
         }
+
+        console.log('[OCR] Bắt đầu tạo worker...');
+        console.log('[OCR] workerPath:', './tesseract/worker.min.js');
+        console.log('[OCR] corePath:', './tesseract/');
+        console.log('[OCR] langPath:', './tesseract/lang-data/');
+
         worker = await Tesseract.createWorker('vie', 1, {
             workerPath: './tesseract/worker.min.js',
             corePath: './tesseract/',
             langPath: './tesseract/lang-data/',
             logger: (m) => {
+                console.log('[OCR]', m.status, m.progress ? Math.round(m.progress * 100) + '%' : '');
                 if (m.status === 'recognizing text') {
                     updateProgress(50 + m.progress * 35, 'Đang đọc ảnh... ' + Math.round(m.progress * 100) + '%');
                 } else if (m.status === 'loading language traineddata') {
@@ -39,10 +46,13 @@ const OCRCompare = (function () {
                 }
             }
         });
+
         await worker.setParameters({
             tessedit_pageseg_mode: '6',
             preserve_interword_spaces: '1'
         });
+
+        console.log('[OCR] Worker sẵn sàng');
         return worker;
     }
 
@@ -68,7 +78,7 @@ const OCRCompare = (function () {
                         data[i] = data[i + 1] = data[i + 2] = val;
                     }
                     ctx.putImageData(imageData, 0, 0);
-                } catch (e) { console.warn('Preprocess skip:', e); }
+                } catch (e) { console.warn('[OCR] Preprocess skip:', e); }
                 canvas.toBlob((blob) => {
                     if (blob) resolve(blob);
                     else reject(new Error('Không tạo được ảnh xử lý.'));
@@ -340,23 +350,36 @@ const OCRCompare = (function () {
     async function processImage(file) {
         showProgress();
         try {
+            console.log('[OCR] === Bắt đầu xử lý ảnh ===');
+            console.log('[OCR] File:', file.name, file.size, 'bytes');
+
             updateProgress(5, 'Đang xử lý ảnh...');
             const processedBlob = await preprocessImage(file);
+            console.log('[OCR] Tiền xử lý xong, blob size:', processedBlob.size);
+
             updateProgress(10, 'Đang khởi tạo OCR...');
             const w = await initWorker();
+
             updateProgress(50, 'Đang đọc ảnh...');
             const result = await w.recognize(processedBlob);
             const text = result.data.text;
+            console.log('[OCR] Text nhận được:', text.substring(0, 200) + '...');
+
             updateProgress(85, 'Đang phân tích...');
             const hrRows = parseOCRText(text);
+            console.log('[OCR] Số dòng parse được:', hrRows.length);
+
             if (hrRows.length === 0) {
-                throw new Error('Không đọc được dòng nào có giờ vào/ra. Thử ảnh rõ hơn.');
+                throw new Error('Không đọc được dòng nào. Thử ảnh rõ hơn.');
             }
+
             updateProgress(92, 'Đang so sánh...');
             const results = compareWithApp(hrRows, workLogs);
+
             updateProgress(100, 'Hoàn tất!');
             renderResults(results);
             lastResults = results;
+
             const okCount = results.filter(r => r.status === 'ok').length;
             const diffCount = results.filter(r => r.status === 'diff').length;
             if (typeof showToast === 'function') {
@@ -364,11 +387,44 @@ const OCRCompare = (function () {
                 else showToast(`⚠️ ${okCount} khớp, ${diffCount} lệch`, 'warning');
             }
             setTimeout(hideProgress, 400);
+            console.log('[OCR] === Xử lý xong ===');
         } catch (err) {
             hideProgress();
-            console.error('OCR Error:', err);
-            if (typeof showToast === 'function') showToast('❌ Lỗi OCR: ' + err.message, 'danger');
-            else alert('Lỗi OCR: ' + err.message);
+            console.error('[OCR] LỖI:', err);
+
+            // Build thông báo lỗi chi tiết
+            let msg = 'Lỗi không xác định';
+            if (err) {
+                if (err.message) msg = err.message;
+                else if (err.name) msg = err.name;
+                else if (typeof err === 'string') msg = err;
+                else {
+                    try { msg = JSON.stringify(err); } catch (e) { msg = String(err); }
+                }
+            }
+            const stack = (err && err.stack) ? err.stack.split('\n').slice(0, 2).join(' → ') : '';
+
+            // Hiển thị toast
+            if (typeof showToast === 'function') {
+                showToast('❌ ' + msg, 'danger');
+            } else {
+                alert('Lỗi OCR: ' + msg);
+            }
+
+            // Hiển thị chi tiết trong phần kết quả
+            const el = document.getElementById('ocr-result');
+            if (el) {
+                el.innerHTML = `
+                    <div style="background:#FEE2E2;border:2px solid #EF4444;border-radius:12px;padding:14px;">
+                        <div style="font-weight:800;color:#991B1B;margin-bottom:8px;">❌ Lỗi OCR</div>
+                        <div style="font-size:13px;color:#7F1D1D;word-break:break-word;"><strong>Message:</strong> ${msg}</div>
+                        ${stack ? `<div style="font-size:11px;color:#991B1B;margin-top:6px;font-family:monospace;word-break:break-word;">${stack}</div>` : ''}
+                        <div style="font-size:11px;color:#991B1B;margin-top:8px;">
+                            Kiểm tra: tesseract/tesseract.min.js, tesseract/worker.min.js, tesseract/tesseract-core.wasm.js, tesseract/lang-data/vie.traineddata.gz
+                        </div>
+                    </div>`;
+                el.style.display = 'block';
+            }
         }
     }
 
