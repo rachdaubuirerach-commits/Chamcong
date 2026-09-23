@@ -1,5 +1,5 @@
 /* ========================================================================
-   TIMETRACKER v3.3 — CSS chính (đã gộp tối ưu + hiệu ứng)
+   TIMETRACKER v3.3 — CSS chính (đã gộp tối ưu + hiệu ứng + OCR)
    ======================================================================== */
 
 :root {
@@ -337,7 +337,6 @@ body::before {
     to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* Card stagger — xuất hiện lần lượt */
 .page-content:not(.hidden) .card {
     animation: cardStagger 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
@@ -1208,7 +1207,6 @@ tr:last-child td { border-bottom: none; }
     z-index: 1001;
     display: flex; align-items: center; justify-content: center;
     animation: fabIn 0.5s var(--ease-spring) 1s both;
-    position: fixed;
     overflow: hidden;
 }
 .fab:active {
@@ -1377,7 +1375,6 @@ tr:last-child td { border-bottom: none; }
 }
 .btn:disabled::after { background: transparent !important; }
 
-/* Theme changing transition */
 html.theme-changing,
 html.theme-changing * {
     transition: background-color 0.5s ease, color 0.5s ease, border-color 0.5s ease !important;
@@ -1453,7 +1450,6 @@ html.theme-changing * {
     body { background: white; padding: 0; }
 }
 
-
 /* ═══════════════════════════════════════════════════════════════
    OCR COMPARE — Đối chiếu công HR
    ═══════════════════════════════════════════════════════════════ */
@@ -1467,85 +1463,225 @@ html.theme-changing * {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .ocr-badge {
     font-size: 12px;
     font-weight: 700;
-    padding: 4px 10px;
+    padding: 5px 12px;
     border-radius: 999px;
     white-space: nowrap;
 }
 .ocr-badge.ok { background: #D1FAE5; color: #065F46; }
 .ocr-badge.diff { background: #FEE2E2; color: #991B1B; }
 .ocr-badge.missing { background: #FEF3C7; color: #92400E; }
-.ocr-badge.skip { background: #E2E8F0; color: #475569; }
 
 [data-theme="dark"] .ocr-badge.ok { background: rgba(16,185,129,0.2); color: #6EE7B7; }
 [data-theme="dark"] .ocr-badge.diff { background: rgba(239,68,68,0.2); color: #FCA5A5; }
 [data-theme="dark"] .ocr-badge.missing { background: rgba(245,158,11,0.2); color: #FCD34D; }
-[data-theme="dark"] .ocr-badge.skip { background: rgba(100,116,139,0.25); color: #CBD5E1; }
 
-.ocr-table {
+.ocr-note {
     font-size: 12px;
-    width: 100%;
-    border-collapse: collapse;
-}
-.ocr-table th {
-    background: var(--surface-2);
-    padding: 8px 4px;
-    font-size: 10px;
-    font-weight: 700;
     color: var(--gray-500);
-    text-align: center;
-    border-bottom: 2px solid var(--border-strong);
-    line-height: 1.2;
+    margin: 0 0 10px 0;
+    padding: 8px 10px;
+    background: var(--surface-2);
+    border-radius: 8px;
+    line-height: 1.4;
 }
-.ocr-table th small {
-    font-size: 9px;
-    color: var(--gray-400);
-    font-weight: 600;
+.ocr-note strong { color: var(--primary); font-weight: 800; }
+
+/* ─── Thẻ kết quả ─── */
+.ocr-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
-.ocr-table td {
-    padding: 7px 4px;
-    border-bottom: 1px solid var(--border);
-    text-align: center;
-    font-weight: 600;
-    color: var(--gray-700);
+
+.ocr-card {
+    border-radius: 14px;
+    padding: 12px 14px;
+    border: 2px solid var(--border-strong);
+    background: var(--surface);
+    box-shadow: 0 2px 8px rgba(15,23,42,0.05);
+}
+.ocr-card-ok {
+    border-color: #10B981;
+    background: linear-gradient(135deg, rgba(16,185,129,0.06), rgba(52,211,153,0.04));
+}
+.ocr-card-diff {
+    border-color: #EF4444;
+    background: linear-gradient(135deg, rgba(239,68,68,0.08), rgba(248,113,113,0.04));
+}
+.ocr-card-missing {
+    border-color: #F59E0B;
+    background: linear-gradient(135deg, rgba(245,158,11,0.08), rgba(251,191,36,0.04));
+}
+[data-theme="dark"] .ocr-card-ok {
+    background: linear-gradient(135deg, rgba(16,185,129,0.14), rgba(52,211,153,0.08));
+}
+[data-theme="dark"] .ocr-card-diff {
+    background: linear-gradient(135deg, rgba(239,68,68,0.16), rgba(248,113,113,0.08));
+}
+[data-theme="dark"] .ocr-card-missing {
+    background: linear-gradient(135deg, rgba(245,158,11,0.16), rgba(251,191,36,0.08));
+}
+
+/* ─── Head của thẻ ─── */
+.ocr-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed rgba(100,116,139,0.25);
+    flex-wrap: wrap;
+}
+.ocr-card-date {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--gray-900);
     font-variant-numeric: tabular-nums;
+    letter-spacing: -0.2px;
 }
-.ocr-table td:first-child {
-    text-align: left;
+.ocr-card-type {
+    font-size: 11px;
     font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(100,116,139,0.15);
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.ocr-card-type.diff {
+    background: rgba(239,68,68,0.2);
+    color: #DC2626;
+    animation: ocrTypePulse 1.2s ease-in-out infinite;
+}
+@keyframes ocrTypePulse {
+    0%,100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+}
+[data-theme="dark"] .ocr-card-type { background: rgba(148,163,184,0.15); color: #CBD5E1; }
+[data-theme="dark"] .ocr-card-type.diff { background: rgba(239,68,68,0.25); color: #FCA5A5; }
+
+.ocr-card-status {
+    margin-left: auto;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gray-700);
     white-space: nowrap;
 }
-.ocr-table .sep {
-    color: var(--gray-400);
-    margin: 0 2px;
-    font-weight: 400;
+.ocr-card-ok .ocr-card-status { color: #059669; }
+.ocr-card-diff .ocr-card-status { color: #DC2626; }
+.ocr-card-missing .ocr-card-status { color: #D97706; }
+[data-theme="dark"] .ocr-card-ok .ocr-card-status { color: #34D399; }
+[data-theme="dark"] .ocr-card-diff .ocr-card-status { color: #FCA5A5; }
+[data-theme="dark"] .ocr-card-missing .ocr-card-status { color: #FCD34D; }
+
+/* ─── Badge ca ngày/đêm ─── */
+.ocr-shift-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 6px;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+.ocr-shift-badge.day {
+    background: rgba(245,158,11,0.18);
+    color: #B45309;
+}
+.ocr-shift-badge.night {
+    background: rgba(99,102,241,0.18);
+    color: #4338CA;
+}
+[data-theme="dark"] .ocr-shift-badge.day {
+    background: rgba(245,158,11,0.25);
+    color: #FCD34D;
+}
+[data-theme="dark"] .ocr-shift-badge.night {
+    background: rgba(99,102,241,0.3);
+    color: #A5B4FC;
 }
 
-.ocr-table tr.row-ok td { background: rgba(16,185,129,0.06); }
-.ocr-table tr.row-diff td { background: rgba(239,68,68,0.08); }
-.ocr-table tr.row-missing td { background: rgba(245,158,11,0.08); }
-.ocr-table tr.row-skip td { opacity: 0.55; }
+/* ─── Body của thẻ: 3 cột (label | App | HR) ─── */
+.ocr-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.ocr-row-head,
+.ocr-row {
+    display: grid;
+    grid-template-columns: 78px 1fr 1fr;
+    gap: 6px;
+    align-items: center;
+}
+.ocr-row-head {
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+}
+.ocr-row-head span {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: center;
+}
+.ocr-row-head span:first-child { text-align: left; }
 
-[data-theme="dark"] .ocr-table tr.row-ok td { background: rgba(16,185,129,0.12); }
-[data-theme="dark"] .ocr-table tr.row-diff td { background: rgba(239,68,68,0.14); }
-[data-theme="dark"] .ocr-table tr.row-missing td { background: rgba(245,158,11,0.14); }
+.ocr-row-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
 
-.ocr-table td.cell-diff {
+.ocr-cell {
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--gray-800);
+    text-align: center;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    transition: all 0.2s ease;
+    letter-spacing: -0.2px;
+}
+.ocr-cell small {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--gray-500);
+    margin-left: 3px;
+    opacity: 0.8;
+}
+.ocr-cell.diff {
+    background: linear-gradient(135deg, rgba(239,68,68,0.18), rgba(248,113,113,0.12));
     color: #DC2626 !important;
-    font-weight: 800 !important;
-    background: rgba(239,68,68,0.15) !important;
-    border-radius: 4px;
+    border: 1.5px solid rgba(239,68,68,0.4);
+    animation: ocrCellPulse 1.8s ease-in-out infinite;
 }
-[data-theme="dark"] .ocr-table td.cell-diff {
+@keyframes ocrCellPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(239,68,68,0); }
+}
+[data-theme="dark"] .ocr-cell {
+    background: var(--surface-3);
+    color: var(--gray-700);
+}
+[data-theme="dark"] .ocr-cell.diff {
+    background: linear-gradient(135deg, rgba(239,68,68,0.3), rgba(248,113,113,0.2));
     color: #FCA5A5 !important;
-    background: rgba(239,68,68,0.25) !important;
+    border-color: rgba(239,68,68,0.6);
 }
 
+/* ─── Progress bar OCR ─── */
 #ocr-progress .progress-bar {
     background: var(--surface-3);
     height: 6px;
