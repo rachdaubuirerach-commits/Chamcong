@@ -49,25 +49,31 @@ jobs:
           curl -fL -o tesseract/lang-data/vie.traineddata.gz \
             "https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/vie.traineddata.gz"
 
+      - name: Download chi_sim.traineddata.gz
+        run: |
+          curl -fL -o tesseract/lang-data/chi_sim.traineddata.gz \
+            "https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/chi_sim.traineddata.gz"
+
       - name: Verify file sizes
         run: |
           echo "=== Checking file sizes ==="
           ls -lah tesseract/
           ls -lah tesseract/lang-data/
           echo ""
-          echo "=== Verify traineddata is not empty ==="
-          SIZE=$(stat -c%s tesseract/lang-data/vie.traineddata.gz)
-          echo "vie.traineddata.gz size: $SIZE bytes"
-          if [ "$SIZE" -lt 1000000 ]; then
-            echo "❌ ERROR: File too small (< 1MB). Download failed!"
+          VIE=$(stat -c%s tesseract/lang-data/vie.traineddata.gz)
+          CHI=$(stat -c%s tesseract/lang-data/chi_sim.traineddata.gz)
+          echo "vie.traineddata.gz: $VIE bytes"
+          echo "chi_sim.traineddata.gz: $CHI bytes"
+          if [ "$VIE" -lt 1000000 ] || [ "$CHI" -lt 1000000 ]; then
+            echo "❌ ERROR: File too small. Download failed!"
             exit 1
           fi
-          echo "✅ File size OK"
+          echo "✅ Files OK"
 
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add tesseract/
-          git commit -m "Add Tesseract core variants" || echo "No changes"
+          git commit -m "Add chi_sim language data" || echo "No changes"
           git push
