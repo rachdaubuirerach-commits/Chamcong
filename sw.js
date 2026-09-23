@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 // ⚠️ ĐỔI SỐ NÀY MỖI LẦN UPDATE
-const CACHE_VERSION = 'v4.3.3';
+const CACHE_VERSION = 'v4.3.4';
 const CACHE_NAME = `timetracker-${CACHE_VERSION}`;
 
 const ASSETS = [
