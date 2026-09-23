@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════
-   ocr-compare.js — Đối chiếu công HR từ ảnh (v4.7 — GỘP DÒNG)
-   - Gộp dòng cùng record trước khi parse
-   - Fix lỗi OCR: "8:75" → "8.75"
-   - Đếm times để xác định ca và giờ vào/ra
+   ocr-compare.js — Đối chiếu công HR từ ảnh (v4.8)
+   - Gộp dòng thông minh (nhận diện số dòng Excel + mã NV)
+   - Fix lỗi OCR: "07 :30" → "07:30", "8:75" → "8.75"
+   - Nối ca: "19:30704: 00" → "19:30~04:00"
+   - Bỏ ngày miễn chấm/nghỉ/lễ
    ═══════════════════════════════════════════════════════════════ */
 
 const OCRCompare = (function () {
@@ -20,13 +21,11 @@ const OCRCompare = (function () {
     const MIN_REG_HOURS = 5;
     const MAX_REG_HOURS = 12;
 
-    // ═══ GIỜ VÀO HỢP LỆ ═══
     const VALID_START_MINUTES = [
         [5 * 60, 9 * 60],
         [17 * 60, 23 * 60]
     ];
 
-    // ═══ GIỜ RA HỢP LỆ ═══
     const VALID_END_MINUTES = [
         [4 * 60, 9 * 60],
         [17 * 60, 21 * 60]
@@ -115,7 +114,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  3. PARSE TEXT OCR (v4.7 — GỘP DÒNG)
+    //  3. PARSE TEXT OCR (v4.8)
     // ═══════════════════════════════════════════════════════════
     function parseOCRText(text) {
         const lines = text.split('\n');
@@ -129,12 +128,17 @@ const OCRCompare = (function () {
             const line = rawLine.trim();
             if (!line) continue;
 
-            if (dateRegex.test(line)) {
-                // Dòng có ngày → bắt đầu record mới
+            const hasDate = dateRegex.test(line);
+            // "17 VN010722", "75 VN010722", "23 | VN010722", "23 | vw010722"
+            const hasRowNumberAndId = /^\d{1,4}\s*[|I]?\s*(VN|vw|VW|vn)\d{4,}/i.test(line);
+
+            if (hasDate) {
                 if (currentRecord) records.push(currentRecord);
                 currentRecord = line;
+            } else if (hasRowNumberAndId && currentRecord) {
+                records.push(currentRecord);
+                currentRecord = line;
             } else if (currentRecord) {
-                // Dòng không có ngày → gộp vào record hiện tại
                 currentRecord += ' ' + line;
             }
         }
@@ -154,13 +158,28 @@ const OCRCompare = (function () {
             const d = String(dateMatch[3]).padStart(2, '0');
             const date = `${y}-${mo}-${d}`;
 
-            // ═══ FIX LỖI OCR: "8:75" → "8.75" ═══
-            // Chỉ fix khi pattern KHÔNG phải giờ hợp lệ
-            const fixedRecord = record.replace(/(\b\d{1,2}):(\d{1,2})\b/g, (match, a, b) => {
+            // Bỏ ngày miễn chấm / nghỉ / lễ
+            if (record.includes('缺卡') || record.includes('休息') || record.includes('免卡') || record.includes('节假日')) {
+                console.log('[OCR] Bỏ (miễn/nghỉ/lễ):', date);
+                continue;
+            }
+
+            // ═══ FIX LỖI OCR ═══
+            let fixedRecord = record;
+
+            // 1. Nối ca: "19:30704: 00" hoặc "19:30704:00" → "19:30~04:00"
+            fixedRecord = fixedRecord.replace(/(\d{2}):(\d{2})7(\d{2}):\s*(\d{2})/g, '$1:$2~$3:$4');
+
+            // 2. Nối số bị tách: "07 :30" → "07:30"
+            fixedRecord = fixedRecord.replace(/(\d{1,2})\s+:\s*(\d{2})/g, '$1:$2');
+
+            // 3. "04: 00" → "04:00"
+            fixedRecord = fixedRecord.replace(/(\d{1,2}):\s+(\d{2})/g, '$1:$2');
+
+            // 4. "8:75" → "8.75" (chỉ khi không phải giờ hợp lệ)
+            fixedRecord = fixedRecord.replace(/(\b\d{1,2}):(\d{1,2})\b/g, (match, a, b) => {
                 const h = parseInt(a), m = parseInt(b);
-                // Nếu là giờ hợp lệ (HH 0-23, MM 0-59) → giữ nguyên
                 if (h >= 0 && h <= 23 && m >= 0 && m <= 59) return match;
-                // Ngược lại → đổi thành dấu . (số thập phân)
                 return a + '.' + b;
             });
 
@@ -172,26 +191,15 @@ const OCRCompare = (function () {
                 allTimes.push(tm[0]);
             }
 
-            if (allTimes.length < 2) continue;
+            if (allTimes.length < 4) continue;
 
-            // ═══ PHÂN LOẠI ═══
-            // 4+ times → 2 đầu là ca, 2 sau là vào/ra
-            // 2 times  → chỉ là ca (ngày lễ/nghỉ)
-            let shiftStart = null, shiftEnd = null;
-            let timesForActual = [];
-
-            if (allTimes.length >= 4) {
-                shiftStart = allTimes[0];
-                shiftEnd = allTimes[1];
-                timesForActual = allTimes.slice(2);
-            } else if (allTimes.length === 2) {
-                shiftStart = allTimes[0];
-                shiftEnd = allTimes[1];
-                timesForActual = [];
-            }
+            // 2 times đầu là ca làm việc
+            const shiftStart = allTimes[0];
+            const shiftEnd = allTimes[1];
+            const timesForActual = allTimes.slice(2);
 
             if (timesForActual.length < 2) {
-                console.log('[OCR] Bỏ (chỉ có ca):', date, shiftStart, '~', shiftEnd);
+                console.log('[OCR] Bỏ (chỉ có ca):', date);
                 continue;
             }
 
