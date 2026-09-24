@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
-   ocr-compare.js — Đối chiếu công HR từ ảnh (v4.8)
+   ocr-compare.js — Đối chiếu công HR từ ảnh (v4.9)
    - Gộp dòng thông minh (nhận diện số dòng Excel + mã NV)
-   - Fix lỗi OCR: "07 :30" → "07:30", "8:75" → "8.75"
+   - Fix lỗi OCR: "07 :30" → "07:30", "8:75" → "8.75", "3. 75" → "3.75"
    - Nối ca: "19:30704: 00" → "19:30~04:00"
    - Bỏ ngày miễn chấm/nghỉ/lễ
    ═══════════════════════════════════════════════════════════════ */
@@ -114,7 +114,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  3. PARSE TEXT OCR (v4.8)
+    //  3. PARSE TEXT OCR (v4.9)
     // ═══════════════════════════════════════════════════════════
     function parseOCRText(text) {
         const lines = text.split('\n');
@@ -129,7 +129,6 @@ const OCRCompare = (function () {
             if (!line) continue;
 
             const hasDate = dateRegex.test(line);
-            // "17 VN010722", "75 VN010722", "23 | VN010722", "23 | vw010722"
             const hasRowNumberAndId = /^\d{1,4}\s*[|I]?\s*(VN|vw|VW|vn)\d{4,}/i.test(line);
 
             if (hasDate) {
@@ -167,10 +166,10 @@ const OCRCompare = (function () {
             // ═══ FIX LỖI OCR ═══
             let fixedRecord = record;
 
-            // 1. Nối ca: "19:30704: 00" hoặc "19:30704:00" → "19:30~04:00"
+            // 1. Nối ca: "19:30704: 00" → "19:30~04:00"
             fixedRecord = fixedRecord.replace(/(\d{2}):(\d{2})7(\d{2}):\s*(\d{2})/g, '$1:$2~$3:$4');
 
-            // 2. Nối số bị tách: "07 :30" → "07:30"
+            // 2. "07 :30" → "07:30"
             fixedRecord = fixedRecord.replace(/(\d{1,2})\s+:\s*(\d{2})/g, '$1:$2');
 
             // 3. "04: 00" → "04:00"
@@ -182,6 +181,14 @@ const OCRCompare = (function () {
                 if (h >= 0 && h <= 23 && m >= 0 && m <= 59) return match;
                 return a + '.' + b;
             });
+
+            // 5. "3. 75" → "3.75" (nối số thập phân bị tách)
+            fixedRecord = fixedRecord.replace(/(\d)\.\s+(\d+)/g, '$1.$2');
+
+            // 6. "3 . 75" → "3.75"
+            fixedRecord = fixedRecord.replace(/(\d)\s+\.\s+(\d+)/g, '$1.$2');
+
+            console.log('[OCR] Fixed record:', date, '→', fixedRecord.substring(0, 200));
 
             // ═══ LẤY TẤT CẢ TIMES ═══
             const timeRegex = /(\d{1,2}):(\d{2})/g;
@@ -589,9 +596,6 @@ const OCRCompare = (function () {
             updateProgress(85, 'Đang phân tích...');
             const hrRows = parseOCRText(text);
             console.log('[OCR] Parse được:', hrRows.length, 'dòng');
-            if (hrRows.length > 0) {
-                console.log('[OCR] Sample record đầu:', hrRows[0]);
-            }
 
             if (hrRows.length === 0) {
                 hideProgress();
