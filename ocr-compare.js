@@ -1,9 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
-   ocr-compare.js — Đối chiếu công HR từ ảnh (v4.9)
-   - Gộp dòng thông minh (nhận diện số dòng Excel + mã NV)
-   - Fix lỗi OCR: "07 :30" → "07:30", "8:75" → "8.75", "3. 75" → "3.75"
-   - Nối ca: "19:30704: 00" → "19:30~04:00"
-   - Bỏ ngày miễn chấm/nghỉ/lễ
+   ocr-compare.js — Đối chiếu công HR từ ảnh (v5.0)
+   - Gộp dòng thông minh, fix lỗi OCR
+   - Xuất ảnh PNG dạng bảng tối giản (nút 📸 Xuất ảnh)
    ═══════════════════════════════════════════════════════════════ */
 
 const OCRCompare = (function () {
@@ -114,7 +112,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  3. PARSE TEXT OCR (v4.9)
+    //  3. PARSE TEXT OCR
     // ═══════════════════════════════════════════════════════════
     function parseOCRText(text) {
         const lines = text.split('\n');
@@ -166,31 +164,18 @@ const OCRCompare = (function () {
             // ═══ FIX LỖI OCR ═══
             let fixedRecord = record;
 
-            // 1. Nối ca: "19:30704: 00" → "19:30~04:00"
             fixedRecord = fixedRecord.replace(/(\d{2}):(\d{2})7(\d{2}):\s*(\d{2})/g, '$1:$2~$3:$4');
-
-            // 2. "07 :30" → "07:30"
             fixedRecord = fixedRecord.replace(/(\d{1,2})\s+:\s*(\d{2})/g, '$1:$2');
-
-            // 3. "04: 00" → "04:00"
             fixedRecord = fixedRecord.replace(/(\d{1,2}):\s+(\d{2})/g, '$1:$2');
-
-            // 4. "8:75" → "8.75" (chỉ khi không phải giờ hợp lệ)
             fixedRecord = fixedRecord.replace(/(\b\d{1,2}):(\d{1,2})\b/g, (match, a, b) => {
                 const h = parseInt(a), m = parseInt(b);
                 if (h >= 0 && h <= 23 && m >= 0 && m <= 59) return match;
                 return a + '.' + b;
             });
-
-            // 5. "3. 75" → "3.75" (nối số thập phân bị tách)
             fixedRecord = fixedRecord.replace(/(\d)\.\s+(\d+)/g, '$1.$2');
-
-            // 6. "3 . 75" → "3.75"
             fixedRecord = fixedRecord.replace(/(\d)\s+\.\s+(\d+)/g, '$1.$2');
 
-            console.log('[OCR] Fixed record:', date, '→', fixedRecord.substring(0, 200));
-
-            // ═══ LẤY TẤT CẢ TIMES ═══
+            // Lấy tất cả times
             const timeRegex = /(\d{1,2}):(\d{2})/g;
             const allTimes = [];
             let tm;
@@ -200,20 +185,16 @@ const OCRCompare = (function () {
 
             if (allTimes.length < 4) continue;
 
-            // 2 times đầu là ca làm việc
             const shiftStart = allTimes[0];
             const shiftEnd = allTimes[1];
             const timesForActual = allTimes.slice(2);
 
-            if (timesForActual.length < 2) {
-                console.log('[OCR] Bỏ (chỉ có ca):', date);
-                continue;
-            }
+            if (timesForActual.length < 2) continue;
 
             const actualStart = normalizeTime(timesForActual[0]);
             const actualEnd = normalizeTime(timesForActual[1]);
 
-            // ═══ LẤY BT VÀ TC ═══
+            // Lấy BT và TC
             const lastTimeStr = timesForActual[1];
             const idx = fixedRecord.lastIndexOf(lastTimeStr);
             const tail = idx === -1 ? '' : fixedRecord.slice(idx + lastTimeStr.length);
@@ -232,13 +213,9 @@ const OCRCompare = (function () {
             }
 
             rows.push({
-                date,
-                shiftStart,
-                shiftEnd,
-                start: actualStart,
-                end: actualEnd,
-                regularHours,
-                overtimeHours,
+                date, shiftStart, shiftEnd,
+                start: actualStart, end: actualEnd,
+                regularHours, overtimeHours,
                 raw: record
             });
         }
@@ -300,54 +277,28 @@ const OCRCompare = (function () {
         for (const r of rows) {
             const y = parseInt(r.date.substring(0, 4));
             if (Math.abs(y - currentYear) > VALID_YEAR_RANGE) {
-                const oldDate = r.date;
                 r.date = String(currentYear) + r.date.substring(4);
-                console.log('[OCR] Fix năm:', oldDate, '→', r.date);
             }
 
             const bt = r.regularHours || 0;
             const ot = r.overtimeHours || 0;
 
-            if (ot > MAX_OT_HOURS) {
-                console.warn('[OCR] Bỏ TC quá lớn:', r.date, 'TC =', ot);
-                continue;
-            }
-            if (bt !== 0 && (bt < MIN_REG_HOURS || bt > MAX_REG_HOURS)) {
-                console.warn('[OCR] Bỏ BT bất thường:', r.date, 'BT =', bt);
-                continue;
-            }
+            if (ot > MAX_OT_HOURS) continue;
+            if (bt !== 0 && (bt < MIN_REG_HOURS || bt > MAX_REG_HOURS)) continue;
 
             const startMin = timeToMinutes(r.start);
-            if (startMin === null) {
-                console.warn('[OCR] Bỏ giờ vào null:', r.date);
-                continue;
-            }
-            if (!isTimeInRanges(startMin, VALID_START_MINUTES)) {
-                console.warn('[OCR] Bỏ giờ vào bất thường:', r.date, r.start);
-                continue;
-            }
+            if (startMin === null) continue;
+            if (!isTimeInRanges(startMin, VALID_START_MINUTES)) continue;
 
             const endMin = timeToMinutes(r.end);
-            if (endMin === null) {
-                console.warn('[OCR] Bỏ giờ ra null:', r.date);
-                continue;
-            }
-            if (!isTimeInRanges(endMin, VALID_END_MINUTES)) {
-                console.warn('[OCR] Bỏ giờ ra bất thường:', r.date, r.end);
-                continue;
-            }
+            if (endMin === null) continue;
+            if (!isTimeInRanges(endMin, VALID_END_MINUTES)) continue;
 
             const isNight = isNightShift(r.start);
             if (isNight) {
-                if (startMin < endMin && (endMin - startMin) < 8 * 60) {
-                    console.warn('[OCR] Bỏ ca đêm bất thường:', r.date);
-                    continue;
-                }
+                if (startMin < endMin && (endMin - startMin) < 8 * 60) continue;
             } else {
-                if (startMin > endMin) {
-                    console.warn('[OCR] Bỏ ca ngày bất thường:', r.date);
-                    continue;
-                }
+                if (startMin > endMin) continue;
             }
 
             filtered.push(r);
@@ -382,7 +333,6 @@ const OCRCompare = (function () {
     // ═══════════════════════════════════════════════════════════
     function compareWithApp(hrRows, workLogs) {
         const cleanedRows = cleanHrRows(hrRows);
-        console.log('[OCR] Dòng gốc:', hrRows.length, '→ sau clean:', cleanedRows.length);
 
         const results = [];
         for (const hr of cleanedRows) {
@@ -433,7 +383,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  7. HIỂN THỊ KẾT QUẢ
+    //  7. HIỂN THỊ KẾT QUẢ (app — dạng thẻ)
     // ═══════════════════════════════════════════════════════════
     function renderResults(results, rawText) {
         const el = document.getElementById('ocr-result');
@@ -548,18 +498,245 @@ const OCRCompare = (function () {
         html += `</div>`;
         el.innerHTML = html;
         el.style.display = 'block';
-        const clearBtn = document.getElementById('ocr-clear-btn');
-        if (clearBtn) clearBtn.style.display = 'block';
+
+        const actions = document.getElementById('ocr-actions');
+        if (actions) actions.style.display = 'flex';
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  8. PROGRESS
+    //  8. HIỂN THỊ TEXT THÔ (khi parse fail)
+    // ═══════════════════════════════════════════════════════════
+    function renderRawText(text, hrRowsCount) {
+        const el = document.getElementById('ocr-result');
+        const escaped = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        el.innerHTML = `
+            <div style="background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:14px;">
+                <div style="font-weight:800;color:#92400E;margin-bottom:8px;">⚠️ Không parse được dòng nào</div>
+                <div style="font-size:12px;color:#78350F;margin-bottom:8px;">
+                    Tesseract đọc được <strong>${text ? text.length : 0}</strong> ký tự.
+                    Parse được <strong>${hrRowsCount}</strong> dòng.
+                </div>
+                <textarea readonly style="width:100%;height:220px;font-family:monospace;font-size:11px;padding:8px;border:1px solid #F59E0B;border-radius:6px;background:#FFFBEB;color:#000;box-sizing:border-box;">${escaped}</textarea>
+            </div>`;
+        el.style.display = 'block';
+
+        const actions = document.getElementById('ocr-actions');
+        if (actions) actions.style.display = 'flex';
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  9. XUẤT ẢNH PNG
+    // ═══════════════════════════════════════════════════════════
+    async function exportImage() {
+        if (!lastResults || lastResults.length === 0) {
+            if (typeof showToast === 'function') showToast('⚠️ Chưa có kết quả để xuất', 'warning');
+            return;
+        }
+
+        const btn = document.getElementById('ocr-export-btn');
+        const originalHTML = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Đang xuất...';
+        }
+
+        try {
+            if (typeof html2canvas === 'undefined') {
+                throw new Error('html2canvas chưa tải');
+            }
+
+            const html = buildExportHTML(lastResults);
+
+            const container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.left = '-9999px';
+            container.style.top = '0';
+            container.style.background = '#FFFFFF';
+            container.innerHTML = html;
+            document.body.appendChild(container);
+
+            const canvas = await html2canvas(container.firstElementChild, {
+                scale: 2,
+                backgroundColor: '#FFFFFF',
+                useCORS: true,
+                logging: false
+            });
+
+            document.body.removeChild(container);
+
+            const now = new Date();
+            const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+            const filename = `doi_chieu_cong_${ts}.png`;
+
+            canvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                if (typeof showToast === 'function') showToast(`✅ Đã xuất ${filename}`, 'success');
+                if (typeof haptic === 'function') haptic();
+                if (typeof playSound === 'function') playSound();
+            }, 'image/png');
+
+        } catch (err) {
+            console.error('[OCR] Export error:', err);
+            if (typeof showToast === 'function') showToast('❌ Lỗi xuất ảnh: ' + (err.message || err), 'danger');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        }
+    }
+
+    // ═══ BUILD HTML CHO ẢNH XUẤT ═══
+    function buildExportHTML(results) {
+        const ok = results.filter(r => r.status === 'ok').length;
+        const diff = results.filter(r => r.status === 'diff').length;
+        const missing = results.filter(r => r.status === 'missing').length;
+
+        const now = new Date();
+        const dateStr = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
+        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+        let monthLabel = '';
+        if (results.length > 0) {
+            const [y, m] = results[0].date.split('-');
+            monthLabel = `Tháng ${m}/${y}`;
+        }
+
+        let html = `
+        <div style="font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background:#FFFFFF; padding:24px; width:720px; box-sizing:border-box; color:#1E293B;">
+            <div style="border-bottom:3px solid #4F46E5; padding-bottom:14px; margin-bottom:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-size:20px; font-weight:800; color:#4F46E5;">📊 ĐỐI CHIẾU CÔNG HR</div>
+                        <div style="font-size:13px; color:#64748B; margin-top:3px;">${monthLabel}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:12px; color:#94A3B8;">Ngày xuất</div>
+                        <div style="font-size:14px; font-weight:700; color:#475569;">${dateStr} ${timeStr}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-bottom:16px;">
+                <div style="flex:1; background:#D1FAE5; border-left:4px solid #10B981; padding:10px 14px; border-radius:8px;">
+                    <div style="font-size:11px; color:#065F46; font-weight:700;">KHỚP</div>
+                    <div style="font-size:22px; font-weight:800; color:#059669;">${ok}</div>
+                </div>
+                <div style="flex:1; background:#FEE2E2; border-left:4px solid #EF4444; padding:10px 14px; border-radius:8px;">
+                    <div style="font-size:11px; color:#991B1B; font-weight:700;">LỆCH</div>
+                    <div style="font-size:22px; font-weight:800; color:#DC2626;">${diff}</div>
+                </div>
+                <div style="flex:1; background:#FEF3C7; border-left:4px solid #F59E0B; padding:10px 14px; border-radius:8px;">
+                    <div style="font-size:11px; color:#92400E; font-weight:700;">THIẾU</div>
+                    <div style="font-size:22px; font-weight:800; color:#D97706;">${missing}</div>
+                </div>
+            </div>
+
+            <table style="width:100%; border-collapse:collapse; font-size:13px; font-family:monospace;">
+                <thead>
+                    <tr style="background:#F1F5F9;">
+                        <th style="padding:8px 6px; text-align:left; font-size:11px; color:#475569; border-bottom:2px solid #CBD5E1;">Ngày</th>
+                        <th style="padding:8px 6px; text-align:left; font-size:11px; color:#475569; border-bottom:2px solid #CBD5E1;">Loại</th>
+                        <th style="padding:8px 6px; text-align:center; font-size:11px; color:#475569; border-bottom:2px solid #CBD5E1;">Vào App→HR</th>
+                        <th style="padding:8px 6px; text-align:center; font-size:11px; color:#475569; border-bottom:2px solid #CBD5E1;">Ra App→HR</th>
+                        <th style="padding:8px 6px; text-align:center; font-size:11px; color:#475569; border-bottom:2px solid #CBD5E1;">BT</th>
+                        <th style="padding:8px 6px; text-align:center; font-size:11px; color:#475569; border-bottom:2px solid #CBD5E1;">TC</th>
+                        <th style="padding:8px 6px; text-align:center; font-size:11px; color:#475569; border-bottom:2px solid #CBD5E1;">KQ</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        for (const r of results) {
+            const isOk = r.status === 'ok';
+            const isDiff = r.status === 'diff';
+            const isMissing = r.status === 'missing';
+
+            let rowBg = '#FFFFFF';
+            if (isOk) rowBg = '#F0FDF4';
+            else if (isDiff) rowBg = '#FEF2F2';
+            else if (isMissing) rowBg = '#FFFBEB';
+
+            const [, mo, d] = r.date.split('-');
+            const dateShort = `${d}/${mo}`;
+            const typeLabel = r.isNight ? '🌙 Đêm' : '☀️ Ngày';
+
+            // Vào
+            const appStart = r.appLog ? r.appLog.start : '—';
+            const hrStart = r.hr.start || '—';
+            const startMatch = r.fields && r.fields.start !== false;
+            const startColor = (r.appLog && !startMatch) ? '#DC2626' : '#1E293B';
+            const startIcon = r.appLog ? (startMatch ? ' ✓' : ' ✗') : '';
+            const startCell = r.appLog ? `${appStart}→${hrStart}${startIcon}` : `${hrStart}`;
+
+            // Ra
+            const appEnd = r.appLog ? r.appLog.end : '—';
+            const hrEnd = r.hr.end || '—';
+            const endMatch = r.fields && r.fields.end !== false;
+            const endColor = (r.appLog && !endMatch) ? '#DC2626' : '#1E293B';
+            const endIcon = r.appLog ? (endMatch ? ' ✓' : ' ✗') : '';
+            const endCell = r.appLog ? `${appEnd}→${hrEnd}${endIcon}` : `${hrEnd}`;
+
+            // BT
+            const appReg = r.appLog ? (r.appLog.regularHours || 0).toFixed(0) : '—';
+            const hrReg = r.hr.regularHours != null ? String(r.hr.regularHours) : '—';
+            const regMatch = r.fields && r.fields.reg !== false;
+            const regColor = (r.appLog && !regMatch) ? '#DC2626' : '#1E293B';
+            const regIcon = r.appLog ? (regMatch ? ' ✓' : ' ✗') : '';
+            const regCell = r.appLog ? `${appReg}→${hrReg}${regIcon}` : `${hrReg}`;
+
+            // TC
+            const appOT = r.appLog ? (r.appLog.overtimeHours || 0).toFixed(2) : '—';
+            const hrOT = r.hr.overtimeHours != null ? String(r.hr.overtimeHours) : '—';
+            const otMatch = r.fields && r.fields.ot !== false;
+            const otColor = (r.appLog && !otMatch) ? '#DC2626' : '#1E293B';
+            const otIcon = r.appLog ? (otMatch ? ' ✓' : ' ✗') : '';
+            const otCell = r.appLog ? `${appOT}→${hrOT}${otIcon}` : `${hrOT}`;
+
+            const kqIcon = isOk ? '✅' : isDiff ? '❌' : '⚠️';
+            const kqText = isOk ? 'Khớp' : isDiff ? 'Lệch' : 'Thiếu';
+            const kqColor = isOk ? '#059669' : isDiff ? '#DC2626' : '#D97706';
+
+            html += `
+                <tr style="background:${rowBg}; border-bottom:1px solid #E2E8F0;">
+                    <td style="padding:8px 6px; font-weight:700; color:#1E293B;">${dateShort}</td>
+                    <td style="padding:8px 6px; color:#475569;">${typeLabel}</td>
+                    <td style="padding:8px 6px; text-align:center; color:${startColor}; font-weight:600;">${startCell}</td>
+                    <td style="padding:8px 6px; text-align:center; color:${endColor}; font-weight:600;">${endCell}</td>
+                    <td style="padding:8px 6px; text-align:center; color:${regColor}; font-weight:600;">${regCell}</td>
+                    <td style="padding:8px 6px; text-align:center; color:${otColor}; font-weight:600;">${otCell}</td>
+                    <td style="padding:8px 6px; text-align:center; color:${kqColor}; font-weight:800; font-size:12px;">${kqIcon} ${kqText}</td>
+                </tr>`;
+        }
+
+        html += `
+                </tbody>
+            </table>
+
+            <div style="margin-top:16px; padding-top:12px; border-top:1px solid #E2E8F0; font-size:11px; color:#64748B; line-height:1.6;">
+                <div>💡 Ngưỡng: Vào/Ra ≤ <strong>15p</strong> · BT ≤ <strong>0.25h</strong> · TC ngày ≤ <strong>0.25h</strong> · TC đêm ≤ <strong>0.5h</strong></div>
+                <div style="margin-top:4px;">📱 TimeTracker · Đối chiếu tự động từ ảnh HR</div>
+            </div>
+        </div>`;
+
+        return html;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  10. PROGRESS
     // ═══════════════════════════════════════════════════════════
     function showProgress() {
         document.getElementById('ocr-progress').style.display = 'block';
         document.getElementById('ocr-result').style.display = 'none';
-        const clearBtn = document.getElementById('ocr-clear-btn');
-        if (clearBtn) clearBtn.style.display = 'none';
+        const actions = document.getElementById('ocr-actions');
+        if (actions) actions.style.display = 'none';
         updateProgress(0, 'Đang chuẩn bị...');
     }
     function hideProgress() {
@@ -573,7 +750,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  9. HÀM CHÍNH
+    //  11. HÀM CHÍNH
     // ═══════════════════════════════════════════════════════════
     async function processImage(file) {
         showProgress();
@@ -654,33 +831,13 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  10. HIỂN THỊ TEXT THÔ
-    // ═══════════════════════════════════════════════════════════
-    function renderRawText(text, hrRowsCount) {
-        const el = document.getElementById('ocr-result');
-        const escaped = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        el.innerHTML = `
-            <div style="background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:14px;">
-                <div style="font-weight:800;color:#92400E;margin-bottom:8px;">⚠️ Không parse được dòng nào</div>
-                <div style="font-size:12px;color:#78350F;margin-bottom:8px;">
-                    Tesseract đọc được <strong>${text ? text.length : 0}</strong> ký tự.
-                    Parse được <strong>${hrRowsCount}</strong> dòng.
-                </div>
-                <textarea readonly style="width:100%;height:220px;font-family:monospace;font-size:11px;padding:8px;border:1px solid #F59E0B;border-radius:6px;background:#FFFBEB;color:#000;box-sizing:border-box;">${escaped}</textarea>
-            </div>`;
-        el.style.display = 'block';
-        const clearBtn = document.getElementById('ocr-clear-btn');
-        if (clearBtn) clearBtn.style.display = 'block';
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  11. XÓA
+    //  12. XÓA
     // ═══════════════════════════════════════════════════════════
     function clear() {
         const el = document.getElementById('ocr-result');
         if (el) { el.innerHTML = ''; el.style.display = 'none'; }
-        const clearBtn = document.getElementById('ocr-clear-btn');
-        if (clearBtn) clearBtn.style.display = 'none';
+        const actions = document.getElementById('ocr-actions');
+        if (actions) actions.style.display = 'none';
         const input = document.getElementById('hr-image-input');
         if (input) input.value = '';
         lastResults = null;
@@ -688,7 +845,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  12. INIT
+    //  13. INIT
     // ═══════════════════════════════════════════════════════════
     function init() {
         const input = document.getElementById('hr-image-input');
@@ -703,5 +860,11 @@ const OCRCompare = (function () {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
 
-    return { processImage, clear, getLastResults: () => lastResults, getRawText: () => lastRawText };
+    return {
+        processImage,
+        clear,
+        exportImage,
+        getLastResults: () => lastResults,
+        getRawText: () => lastRawText
+    };
 })();
