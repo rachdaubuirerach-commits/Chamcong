@@ -2,7 +2,7 @@
    sw.js — TimeTracker (Tesseract offline local)
    ═══════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION = 'v4.4.7';
+const CACHE_VERSION = 'v4.4.2';
 const CACHE_NAME = `timetracker-${CACHE_VERSION}`;
 
 const ASSETS = [
@@ -58,8 +58,15 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
     if (event.request.method !== 'GET') return;
+
     const url = new URL(event.request.url);
-    if (url.origin !== location.origin) return;
+
+    // Cho phép cả CDN heic2any
+    const isCDN = url.hostname.includes('jsdelivr.net') ||
+                  url.hostname.includes('cloudflare.com');
+    const isSameOrigin = url.origin === location.origin;
+
+    if (!isSameOrigin && !isCDN) return;
 
     // HTML: network first
     if (event.request.mode === 'navigate' ||
@@ -74,8 +81,10 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // File nặng: cache first
-    const isHeavy = /\.(wasm|traineddata|gz)$/i.test(url.pathname);
+    // File nặng (wasm, traineddata, gz) + CDN JS: cache first
+    const isHeavy = /\.(wasm|traineddata|gz)$/i.test(url.pathname) ||
+                    (isCDN && url.pathname.endsWith('.js'));
+
     if (isHeavy) {
         event.respondWith(
             caches.match(event.request).then(cached => {

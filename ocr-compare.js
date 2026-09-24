@@ -1,7 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════
-   ocr-compare.js — Đối chiếu công HR từ ảnh (v5.0)
-   - Gộp dòng thông minh, fix lỗi OCR
-   - Xuất ảnh PNG dạng bảng tối giản (nút 📸 Xuất ảnh)
+   ocr-compare.js — Đối chiếu công HR từ ảnh (v5.1)
+   - Hỗ trợ iPhone (HEIC, ảnh lớn) + Android
+   - Tự động chọn scale thông minh
+   - Giới hạn kích thước canvas để tránh RAM Safari
    ═══════════════════════════════════════════════════════════════ */
 
 const OCRCompare = (function () {
@@ -28,6 +29,10 @@ const OCRCompare = (function () {
         [4 * 60, 9 * 60],
         [17 * 60, 21 * 60]
     ];
+
+    // ═══ GIỚI HẠN ẢNH CHO IPHONE SAFARI ═══
+    const MAX_IMAGE_DIMENSION = 3000;
+    const MAX_IMAGE_PIXELS = 9000000; // 9 megapixel
 
     let worker = null;
     let lastResults = null;
@@ -71,26 +76,87 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  2. TIỀN XỬ LÝ ẢNH
+    //  2. XỬ LÝ FILE HEIC (iPhone)
+    // ═══════════════════════════════════════════════════════════
+    async function convertHeicIfNeeded(file) {
+        const isHeic = /\.(heic|heif)$/i.test(file.name) ||
+                       file.type === 'image/heic' ||
+                       file.type === 'image/heif';
+
+        if (!isHeic) return file;
+
+        if (typeof heic2any === 'undefined') {
+            console.warn('[OCR] heic2any chưa tải — không chuyển được HEIC');
+            throw new Error('Ảnh HEIC cần thư viện heic2any. Vui lòng chụp ảnh JPG hoặc tải lại trang.');
+        }
+
+        console.log('[OCR] Phát hiện ảnh HEIC, đang chuyển sang JPG...');
+        updateProgress(2, 'Đang chuyển ảnh HEIC...');
+
+        try {
+            const blob = await heic2any({
+                blob: file,
+                toType: 'image/jpeg',
+                quality: 0.92
+            });
+
+            const resultBlob = Array.isArray(blob) ? blob[0] : blob;
+            const newName = file.name.replace(/\.(heic|heif)$/i, '.jpg');
+
+            console.log('[OCR] Đã chuyển HEIC → JPG, size:', resultBlob.size);
+            return new File([resultBlob], newName, { type: 'image/jpeg' });
+        } catch (err) {
+            console.error('[OCR] Lỗi chuyển HEIC:', err);
+            throw new Error('Không chuyển được ảnh HEIC: ' + (err.message || err));
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  3. TIỀN XỬ LÝ ẢNH (thông minh cho iPhone + Android)
     // ═══════════════════════════════════════════════════════════
     function preprocessImage(file) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                const scale = 2;
-                canvas.width = img.width * scale;
-                canvas.height = img.height * scale;
+
+                const maxDim = Math.max(img.width, img.height);
+                let scale = 1;
+
+                if (maxDim < 1000) scale = 2;
+                else if (maxDim < 2000) scale = 1.5;
+                else if (maxDim < 3000) scale = 1;
+                else scale = MAX_IMAGE_DIMENSION / maxDim;
+
+                let finalW = Math.round(img.width * scale);
+                let finalH = Math.round(img.height * scale);
+                let totalPixels = finalW * finalH;
+
+                if (totalPixels > MAX_IMAGE_PIXELS) {
+                    const ratio = Math.sqrt(MAX_IMAGE_PIXELS / totalPixels);
+                    finalW = Math.round(finalW * ratio);
+                    finalH = Math.round(finalH * ratio);
+                    scale = finalW / img.width;
+                }
+
+                console.log('[OCR] Ảnh gốc:', img.width, 'x', img.height);
+                console.log('[OCR] Scale:', scale.toFixed(2));
+                console.log('[OCR] Ảnh sau scale:', finalW, 'x', finalH, '(' + (finalW * finalH / 1000000).toFixed(1) + 'MP)');
+
+                canvas.width = finalW;
+                canvas.height = finalH;
                 const ctx = canvas.getContext('2d');
+
                 ctx.imageSmoothingEnabled = true;
                 ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, finalW, finalH);
 
                 try {
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const imageData = ctx.getImageData(0, 0, finalW, finalH);
                     const data = imageData.data;
                     const contrast = 1.3;
                     const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+
                     for (let i = 0; i < data.length; i += 4) {
                         const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
                         const val = Math.max(0, Math.min(255, factor * (gray - 128) + 128));
@@ -101,10 +167,18 @@ const OCRCompare = (function () {
                     console.warn('[OCR] Preprocess skip:', e);
                 }
 
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                const format = isIOS ? 'image/jpeg' : 'image/png';
+                const quality = isIOS ? 0.92 : undefined;
+
                 canvas.toBlob((blob) => {
-                    if (blob) resolve(blob);
-                    else reject(new Error('Không tạo được ảnh xử lý.'));
-                }, 'image/png');
+                    if (blob) {
+                        console.log('[OCR] Blob sau xử lý:', blob.size, 'bytes, format:', format);
+                        resolve(blob);
+                    } else {
+                        reject(new Error('Không tạo được ảnh xử lý.'));
+                    }
+                }, format, quality);
             };
             img.onerror = () => reject(new Error('Không đọc được file ảnh.'));
             img.src = URL.createObjectURL(file);
@@ -112,13 +186,12 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  3. PARSE TEXT OCR
+    //  4. PARSE TEXT OCR
     // ═══════════════════════════════════════════════════════════
     function parseOCRText(text) {
         const lines = text.split('\n');
         const dateRegex = /(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/;
 
-        // ═══ BƯỚC 1: GỘP DÒNG CÙNG RECORD ═══
         const records = [];
         let currentRecord = '';
 
@@ -143,7 +216,6 @@ const OCRCompare = (function () {
 
         console.log('[OCR] Gộp được', records.length, 'records');
 
-        // ═══ BƯỚC 2: PARSE TỪNG RECORD ═══
         const rows = [];
 
         for (const record of records) {
@@ -155,13 +227,11 @@ const OCRCompare = (function () {
             const d = String(dateMatch[3]).padStart(2, '0');
             const date = `${y}-${mo}-${d}`;
 
-            // Bỏ ngày miễn chấm / nghỉ / lễ
             if (record.includes('缺卡') || record.includes('休息') || record.includes('免卡') || record.includes('节假日')) {
                 console.log('[OCR] Bỏ (miễn/nghỉ/lễ):', date);
                 continue;
             }
 
-            // ═══ FIX LỖI OCR ═══
             let fixedRecord = record;
 
             fixedRecord = fixedRecord.replace(/(\d{2}):(\d{2})7(\d{2}):\s*(\d{2})/g, '$1:$2~$3:$4');
@@ -175,7 +245,6 @@ const OCRCompare = (function () {
             fixedRecord = fixedRecord.replace(/(\d)\.\s+(\d+)/g, '$1.$2');
             fixedRecord = fixedRecord.replace(/(\d)\s+\.\s+(\d+)/g, '$1.$2');
 
-            // Lấy tất cả times
             const timeRegex = /(\d{1,2}):(\d{2})/g;
             const allTimes = [];
             let tm;
@@ -194,7 +263,6 @@ const OCRCompare = (function () {
             const actualStart = normalizeTime(timesForActual[0]);
             const actualEnd = normalizeTime(timesForActual[1]);
 
-            // Lấy BT và TC
             const lastTimeStr = timesForActual[1];
             const idx = fixedRecord.lastIndexOf(lastTimeStr);
             const tail = idx === -1 ? '' : fixedRecord.slice(idx + lastTimeStr.length);
@@ -230,7 +298,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  4. HELPERS
+    //  5. HELPERS
     // ═══════════════════════════════════════════════════════════
     function timeToMinutes(t) {
         if (!t) return null;
@@ -268,7 +336,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  5. CLEAN HR ROWS
+    //  6. CLEAN HR ROWS
     // ═══════════════════════════════════════════════════════════
     function cleanHrRows(rows) {
         const currentYear = new Date().getFullYear();
@@ -329,7 +397,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  6. SO SÁNH
+    //  7. SO SÁNH
     // ═══════════════════════════════════════════════════════════
     function compareWithApp(hrRows, workLogs) {
         const cleanedRows = cleanHrRows(hrRows);
@@ -383,7 +451,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  7. HIỂN THỊ KẾT QUẢ (app — dạng thẻ)
+    //  8. HIỂN THỊ KẾT QUẢ
     // ═══════════════════════════════════════════════════════════
     function renderResults(results, rawText) {
         const el = document.getElementById('ocr-result');
@@ -504,7 +572,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  8. HIỂN THỊ TEXT THÔ (khi parse fail)
+    //  9. HIỂN THỊ TEXT THÔ
     // ═══════════════════════════════════════════════════════════
     function renderRawText(text, hrRowsCount) {
         const el = document.getElementById('ocr-result');
@@ -525,7 +593,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  9. XUẤT ẢNH PNG
+    //  10. XUẤT ẢNH PNG
     // ═══════════════════════════════════════════════════════════
     async function exportImage() {
         if (!lastResults || lastResults.length === 0) {
@@ -668,7 +736,6 @@ const OCRCompare = (function () {
             const dateShort = `${d}/${mo}`;
             const typeLabel = r.isNight ? '🌙 Đêm' : '☀️ Ngày';
 
-            // Vào
             const appStart = r.appLog ? r.appLog.start : '—';
             const hrStart = r.hr.start || '—';
             const startMatch = r.fields && r.fields.start !== false;
@@ -676,7 +743,6 @@ const OCRCompare = (function () {
             const startIcon = r.appLog ? (startMatch ? ' ✓' : ' ✗') : '';
             const startCell = r.appLog ? `${appStart}→${hrStart}${startIcon}` : `${hrStart}`;
 
-            // Ra
             const appEnd = r.appLog ? r.appLog.end : '—';
             const hrEnd = r.hr.end || '—';
             const endMatch = r.fields && r.fields.end !== false;
@@ -684,7 +750,6 @@ const OCRCompare = (function () {
             const endIcon = r.appLog ? (endMatch ? ' ✓' : ' ✗') : '';
             const endCell = r.appLog ? `${appEnd}→${hrEnd}${endIcon}` : `${hrEnd}`;
 
-            // BT
             const appReg = r.appLog ? (r.appLog.regularHours || 0).toFixed(0) : '—';
             const hrReg = r.hr.regularHours != null ? String(r.hr.regularHours) : '—';
             const regMatch = r.fields && r.fields.reg !== false;
@@ -692,7 +757,6 @@ const OCRCompare = (function () {
             const regIcon = r.appLog ? (regMatch ? ' ✓' : ' ✗') : '';
             const regCell = r.appLog ? `${appReg}→${hrReg}${regIcon}` : `${hrReg}`;
 
-            // TC
             const appOT = r.appLog ? (r.appLog.overtimeHours || 0).toFixed(2) : '—';
             const hrOT = r.hr.overtimeHours != null ? String(r.hr.overtimeHours) : '—';
             const otMatch = r.fields && r.fields.ot !== false;
@@ -730,7 +794,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  10. PROGRESS
+    //  11. PROGRESS
     // ═══════════════════════════════════════════════════════════
     function showProgress() {
         document.getElementById('ocr-progress').style.display = 'block';
@@ -750,16 +814,21 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  11. HÀM CHÍNH
+    //  12. HÀM CHÍNH
     // ═══════════════════════════════════════════════════════════
     async function processImage(file) {
         showProgress();
         try {
             console.log('[OCR] === Bắt đầu ===');
-            console.log('[OCR] File:', file.name, file.size, 'bytes');
+            console.log('[OCR] File gốc:', file.name, file.size, 'bytes, type:', file.type);
+
+            const processedFile = await convertHeicIfNeeded(file);
+            if (processedFile !== file) {
+                console.log('[OCR] Đã xử lý HEIC, file mới:', processedFile.name, processedFile.size);
+            }
 
             updateProgress(5, 'Đang xử lý ảnh...');
-            const processedBlob = await preprocessImage(file);
+            const processedBlob = await preprocessImage(processedFile);
 
             updateProgress(10, 'Đang khởi tạo OCR...');
             const w = await initWorker();
@@ -831,7 +900,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  12. XÓA
+    //  13. XÓA
     // ═══════════════════════════════════════════════════════════
     function clear() {
         const el = document.getElementById('ocr-result');
@@ -845,7 +914,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  13. INIT
+    //  14. INIT
     // ═══════════════════════════════════════════════════════════
     function init() {
         const input = document.getElementById('hr-image-input');
