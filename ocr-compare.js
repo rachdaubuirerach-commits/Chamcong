@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════
-   ocr-compare.js — Đối chiếu công HR từ ảnh (v5.1)
+   ocr-compare.js — Đối chiếu công HR từ ảnh (v5.2)
    - Hỗ trợ iPhone (HEIC, ảnh lớn) + Android
-   - Tự động chọn scale thông minh
-   - Giới hạn kích thước canvas để tránh RAM Safari
+   - Ngưỡng giờ vào: ±60 phút (1 giờ)
+   - Ngưỡng giờ ra: ±15 phút
    ═══════════════════════════════════════════════════════════════ */
 
 const OCRCompare = (function () {
@@ -33,7 +33,7 @@ const OCRCompare = (function () {
 
     // ═══ GIỚI HẠN ẢNH CHO IPHONE SAFARI ═══
     const MAX_IMAGE_DIMENSION = 3000;
-    const MAX_IMAGE_PIXELS = 9000000; // 9 megapixel
+    const MAX_IMAGE_PIXELS = 9000000;
 
     let worker = null;
     let lastResults = null;
@@ -113,7 +113,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  3. TIỀN XỬ LÝ ẢNH (thông minh cho iPhone + Android)
+    //  3. TIỀN XỬ LÝ ẢNH
     // ═══════════════════════════════════════════════════════════
     function preprocessImage(file) {
         return new Promise((resolve, reject) => {
@@ -421,11 +421,11 @@ const OCRCompare = (function () {
             const isNight = isNightShift(hr.start || appLog.start);
 
             const startDiff = timeDiffMinutes(appLog.start, hr.start);
-            if (startDiff === null || startDiff <= TOLERANCE_MINUTES) fields.start = true;
+            if (startDiff === null || startDiff <= TOLERANCE_START_MINUTES) fields.start = true;
             else { fields.start = false; diffs.push(`Vào lệch ${startDiff}p`); }
 
             const endDiff = timeDiffMinutes(appLog.end, hr.end);
-            if (endDiff === null || endDiff <= TOLERANCE_MINUTES) fields.end = true;
+            if (endDiff === null || endDiff <= TOLERANCE_END_MINUTES) fields.end = true;
             else { fields.end = false; diffs.push(`Ra lệch ${endDiff}p`); }
 
             const regDiff = numDiff(appLog.regularHours || 0, hr.regularHours || 0);
@@ -467,7 +467,8 @@ const OCRCompare = (function () {
                 <span class="ocr-badge missing">⚠️ Thiếu: ${missing}</span>
             </div>
             <p class="ocr-note">
-                💡 Ngưỡng: Vào/Ra ≤ <strong>${TOLERANCE_MINUTES}p</strong> ·
+                💡 Ngưỡng: Vào ≤ <strong>${TOLERANCE_START_MINUTES}p (1h)</strong> ·
+                Ra ≤ <strong>${TOLERANCE_END_MINUTES}p</strong> ·
                 BT ≤ <strong>${TOLERANCE_HOURS}h</strong> ·
                 TC ca ngày ≤ <strong>${TOLERANCE_OT_DAY}h</strong> ·
                 TC ca đêm ≤ <strong>${TOLERANCE_OT_NIGHT}h</strong>
@@ -786,7 +787,7 @@ const OCRCompare = (function () {
             </table>
 
             <div style="margin-top:16px; padding-top:12px; border-top:1px solid #E2E8F0; font-size:11px; color:#64748B; line-height:1.6;">
-                <div>💡 Ngưỡng: Vào/Ra ≤ <strong>15p</strong> · BT ≤ <strong>0.25h</strong> · TC ngày ≤ <strong>0.25h</strong> · TC đêm ≤ <strong>0.5h</strong></div>
+                <div>💡 Ngưỡng: Vào ≤ <strong>1 giờ</strong> · Ra ≤ <strong>15p</strong> · BT ≤ <strong>0.25h</strong> · TC ngày ≤ <strong>0.25h</strong> · TC đêm ≤ <strong>0.5h</strong></div>
                 <div style="margin-top:4px;">📱 TimeTracker · Đối chiếu tự động từ ảnh HR</div>
             </div>
         </div>`;
