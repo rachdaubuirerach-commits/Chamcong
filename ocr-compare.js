@@ -9,7 +9,8 @@ const OCRCompare = (function () {
     'use strict';
 
     // ═══ NGƯỠNG SAI SỐ ═══
-    const TOLERANCE_MINUTES = 15;
+    const TOLERANCE_START_MINUTES = 60;   // Giờ vào: lệch tối đa 1 giờ
+    const TOLERANCE_END_MINUTES = 15;     // Giờ ra: lệch tối đa 15 phút
     const TOLERANCE_HOURS = 0.25;
     const TOLERANCE_OT_DAY = 0.25;
     const TOLERANCE_OT_NIGHT = 0.5;
