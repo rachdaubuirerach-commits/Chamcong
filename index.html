@@ -675,10 +675,16 @@
                 <p id="ocr-progress-text" style="font-size:12px;text-align:center;margin-top:6px;color:var(--gray-500);font-weight:600;">Đang xử lý...</p>
             </div>
             <div id="ocr-result" style="display:none;margin-top:12px;"></div>
-            <button class="btn btn-secondary w-full" id="ocr-clear-btn" style="display:none;margin-top:8px;" onclick="OCRCompare.clear()">
-                <svg width="16" height="16"><use href="#i-x"/></svg>
-                <span>Xóa kết quả</span>
-            </button>
+            <div id="ocr-actions" style="display:none;margin-top:8px;gap:8px;display:flex;">
+    <button class="btn btn-success" id="ocr-export-btn" style="flex:1;" onclick="OCRCompare.exportImage()">
+        <svg width="16" height="16"><use href="#i-image"/></svg>
+        <span>📸 Xuất ảnh</span>
+    </button>
+    <button class="btn btn-secondary" id="ocr-clear-btn" style="flex:1;" onclick="OCRCompare.clear()">
+        <svg width="16" height="16"><use href="#i-x"/></svg>
+        <span>Xóa</span>
+    </button>
+</div>
         </div>
         <!-- ═══ HẾT ĐỐI CHIẾU CÔNG HR ═══ -->
 
@@ -782,15 +788,15 @@
 <!-- ═══════════════════════════════════════════════════════════
      SCRIPTS
      ═══════════════════════════════════════════════════════════ -->
-<script src="lunar-engine.js?v=7"></script>
-<script src="holiday-data.js?v=7"></script>
-<script src="holiday-resolver.js?v=7"></script>
+<script src="lunar-engine.js?v=2"></script>
+<script src="holiday-data.js?v=2"></script>
+<script src="holiday-resolver.js?v=2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
-<script src="effects.js?v=7"></script>
-<script src="image-export.js?v=7"></script>
+<script src="effects.js?v=2"></script>
+<script src="image-export.js?v=2"></script>
 <script src="tesseract/tesseract.min.js"></script>
-<script src="ocr-compare.js?v=8"></script>
-<script src="script.js?v=7"></script>
+<script src="ocr-compare.js?v=1"></script>
+<script src="script.js?v=2"></script>
 
 <!-- ═══════════════════════════════════════════════════════════
      RETRO TẾT TRUNG THU — Toggle logic
