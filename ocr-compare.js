@@ -1,8 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════
-   ocr-compare.js — Đối chiếu công HR từ ảnh (v5.2)
+   ocr-compare.js — Adaptive OCR Engine v6 (Phase 1)
    - Hỗ trợ iPhone (HEIC, ảnh lớn) + Android
-   - Ngưỡng giờ vào: ±60 phút (1 giờ)
-   - Ngưỡng giờ ra: ±15 phút
+   - Mathematical Validation: tính TC dự kiến từ giờ vào/ra
+   - Candidate Generator: sinh nhiều khả năng từ raw OCR
+   - Auto-fix TC khi sai (dựa vào math + rules)
+   - Hiển thị badge tự sửa / cần review
    ═══════════════════════════════════════════════════════════════ */
 
 const OCRCompare = (function () {
@@ -34,6 +36,25 @@ const OCRCompare = (function () {
     // ═══ GIỚI HẠN ẢNH CHO IPHONE SAFARI ═══
     const MAX_IMAGE_DIMENSION = 3000;
     const MAX_IMAGE_PIXELS = 9000000;
+
+    // ═══ ADAPTIVE OCR ENGINE v6 — PHASE 1 CONSTANTS ═══
+    const OCR_CHAR_MAP = {
+        'S': '3', 's': '3',
+        'O': '0', 'o': '0',
+        'I': '1', 'l': '1', '|': '1',
+        'Z': '2', 'z': '2',
+        'G': '6', 'b': '6',
+        'B': '8',
+        'T': '7',
+        'g': '9', 'q': '9'
+    };
+
+    const COMMON_OT_VALUES = [
+        0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75,
+        3, 3.25, 3.5, 3.75, 4, 4.25, 4.5, 4.75, 5
+    ];
+
+    const OT_TOLERANCE = 0.5; // Ngưỡng lệch TC cho phép (giờ)
 
     let worker = null;
     let lastResults = null;
@@ -337,7 +358,169 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  6. CLEAN HR ROWS
+    //  6. ADAPTIVE OCR ENGINE v6 — Helper Functions
+    // ═══════════════════════════════════════════════════════════
+
+    // ═══ 6.1. Tính TC dự kiến từ giờ vào/ra ═══
+    function calculateExpectedOT(gioVao, gioRa, loaiCa) {
+        const startMin = timeToMinutes(gioVao);
+        const endMin = timeToMinutes(gioRa);
+        if (startMin === null || endMin === null) return null;
+
+        // Ca đêm: TC bắt đầu từ 04:30 hôm sau
+        // Ca sáng: TC bắt đầu từ 16:30 cùng ngày
+        const tcStart = loaiCa === 'Đêm' ? (4 * 60 + 30) : (16 * 60 + 30);
+
+        let realEnd = endMin;
+        if (loaiCa === 'Đêm' && endMin < 12 * 60) {
+            realEnd = endMin + 24 * 60;
+        }
+
+        if (realEnd <= tcStart) return 0;
+
+        let ot = (realEnd - tcStart) / 60;
+
+        // Thưởng 0.5h nếu TC >= 3
+        if (ot >= 3) ot += 0.5;
+
+        // Phụ cấp đêm 0.25h
+        if (loaiCa === 'Đêm' && ot > 0) ot += 0.25;
+
+        return Math.round(ot * 100) / 100;
+    }
+
+    // ═══ 6.2. Sinh candidate từ raw OCR text ═══
+    function generateCandidates(rawText) {
+        if (!rawText) return [];
+
+        const candidates = new Set();
+        const raw = String(rawText).trim();
+
+        // Candidate 1: Raw as-is
+        const rawNum = parseFloat(raw.replace(',', '.'));
+        if (!isNaN(rawNum) && rawNum >= 0) candidates.add(rawNum);
+
+        // Candidate 2: Map ký tự lỗi OCR
+        let mapped = raw;
+        for (const [from, to] of Object.entries(OCR_CHAR_MAP)) {
+            mapped = mapped.split(from).join(to);
+        }
+        const mappedNum = parseFloat(mapped.replace(',', '.'));
+        if (!isNaN(mappedNum) && mappedNum >= 0) candidates.add(mappedNum);
+
+        // Candidate 3: Chỉ lấy số + dấu chấm
+        const digitsOnly = raw.replace(/[^0-9.]/g, '');
+        const digitsNum = parseFloat(digitsOnly);
+        if (!isNaN(digitsNum) && digitsNum >= 0) candidates.add(digitsNum);
+
+        // Candidate 4: Nếu có 3 chữ số liền "375" → "3.75", "37.5"
+        const digits = raw.replace(/[^0-9]/g, '');
+        if (digits.length === 3) {
+            candidates.add(parseFloat(digits[0] + '.' + digits.slice(1)));
+            candidates.add(parseFloat(digits.slice(0, 2) + '.' + digits.slice(2)));
+        }
+
+        // Candidate 5: Nhân/chia 10
+        if (!isNaN(rawNum) && rawNum > 0) {
+            if (rawNum > 20) candidates.add(Math.round(rawNum / 10 * 100) / 100);
+            if (rawNum < 0.5 && rawNum > 0) candidates.add(Math.round(rawNum * 10 * 100) / 100);
+        }
+
+        return [...candidates].filter(c => c >= 0 && c <= 12);
+    }
+
+    // ═══ 6.3. Chọn candidate tốt nhất dựa vào expected ═══
+    function pickBestCandidate(candidates, expected) {
+        if (candidates.length === 0) return null;
+
+        if (expected === null || expected === undefined) {
+            let best = candidates[0];
+            let bestScore = -Infinity;
+            for (const c of candidates) {
+                let score = 0;
+                if (COMMON_OT_VALUES.includes(c)) score += 10;
+                if (c === 0 || c === 3.75) score += 5;
+                if (score > bestScore) { bestScore = score; best = c; }
+            }
+            return best;
+        }
+
+        let best = candidates[0];
+        let bestDiff = Math.abs(candidates[0] - expected);
+        for (const c of candidates) {
+            const diff = Math.abs(c - expected);
+            if (diff < bestDiff) { bestDiff = diff; best = c; }
+        }
+        return best;
+    }
+
+    // ═══ 6.4. Validate + Auto-fix TC cho 1 record ═══
+    function validateAndFixOT(record) {
+        const result = {
+            fixed: false,
+            reason: null,
+            original: record.overtimeHours,
+            newValue: record.overtimeHours,
+            confidence: 'high',
+            expected: null,
+            candidates: []
+        };
+
+        // Chỉ fix ca đêm (ca sáng ít bị lỗi hơn)
+        if (record.shift !== 'Đêm') return result;
+
+        // Chỉ fix khi TC > 0
+        if (!record.overtimeHours || record.overtimeHours <= 0) return result;
+
+        // Tính TC dự kiến
+        const expected = calculateExpectedOT(record.start, record.end, record.shift);
+        if (expected === null) return result;
+
+        result.expected = expected;
+
+        // Nếu TC khớp với dự kiến → OK
+        const diff = Math.abs(record.overtimeHours - expected);
+        if (diff <= OT_TOLERANCE) {
+            return result;
+        }
+
+        console.log(`[OCR] TC sai cho ${record.date}: ${record.overtimeHours} vs expected ${expected} (lệch ${diff.toFixed(2)}h)`);
+
+        const candidates = generateCandidates(String(record.overtimeHours));
+        result.candidates = candidates;
+
+        if (candidates.length === 0) {
+            result.confidence = 'low';
+            result.reason = 'Không sinh được candidate';
+            return result;
+        }
+
+        const best = pickBestCandidate(candidates, expected);
+        const bestDiff = Math.abs(best - expected);
+
+        if (bestDiff <= OT_TOLERANCE) {
+            result.fixed = true;
+            result.newValue = best;
+            result.confidence = 'high';
+            result.reason = `Tự sửa từ ${record.overtimeHours} → ${best} (expected ${expected})`;
+            console.log(`[OCR] ✅ Tự sửa TC: ${record.overtimeHours} → ${best}`);
+        } else if (bestDiff <= OT_TOLERANCE * 2) {
+            result.fixed = true;
+            result.newValue = best;
+            result.confidence = 'medium';
+            result.reason = `Sửa nhưng chưa chắc: ${record.overtimeHours} → ${best}`;
+            console.log(`[OCR] ⚠️ Sửa TC (không chắc): ${record.overtimeHours} → ${best}`);
+        } else {
+            result.confidence = 'low';
+            result.reason = `TC lệch ${diff.toFixed(2)}h, không fix được`;
+            console.log(`[OCR] ❌ Không fix được TC: ${record.overtimeHours} vs expected ${expected}`);
+        }
+
+        return result;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  7. CLEAN HR ROWS
     // ═══════════════════════════════════════════════════════════
     function cleanHrRows(rows) {
         const currentYear = new Date().getFullYear();
@@ -398,11 +581,37 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  7. SO SÁNH
+    //  8. SO SÁNH (có Adaptive Validation)
     // ═══════════════════════════════════════════════════════════
     function compareWithApp(hrRows, workLogs) {
         const cleanedRows = cleanHrRows(hrRows);
 
+        // ═══ ADAPTIVE ENGINE v6 — Validate + Auto-fix TC ═══
+        console.log('[OCR] === Bắt đầu Adaptive Validation ===');
+        const fixStats = { total: 0, fixed: 0, uncertain: 0, failed: 0 };
+
+        for (const hr of cleanedRows) {
+            const v = validateAndFixOT(hr);
+            fixStats.total++;
+
+            if (v.fixed) {
+                hr.overtimeHours = v.newValue;
+                hr.autoFixed = true;
+                hr.originalOT = v.original;
+                hr.fixConfidence = v.confidence;
+                if (v.confidence === 'high') fixStats.fixed++;
+                else fixStats.uncertain++;
+            } else if (v.confidence === 'low' && v.reason) {
+                hr.needsReview = true;
+                hr.suggestedOT = v.expected;
+                fixStats.failed++;
+            }
+        }
+
+        console.log(`[OCR] Validation stats: ${fixStats.fixed} tự sửa chắc, ${fixStats.uncertain} sửa không chắc, ${fixStats.failed} không sửa được, tổng ${fixStats.total}`);
+        console.log('[OCR] === Kết thúc Adaptive Validation ===');
+
+        // ═══ SO SÁNH ═══
         const results = [];
         for (const hr of cleanedRows) {
             const appLog = workLogs.find(l => l.date === hr.date);
@@ -452,7 +661,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  8. HIỂN THỊ KẾT QUẢ
+    //  9. HIỂN THỊ KẾT QUẢ (có badge tự sửa)
     // ═══════════════════════════════════════════════════════════
     function renderResults(results, rawText) {
         const el = document.getElementById('ocr-result');
@@ -460,11 +669,15 @@ const OCRCompare = (function () {
         const diff = results.filter(r => r.status === 'diff').length;
         const missing = results.filter(r => r.status === 'missing').length;
 
+        // Đếm số tự sửa
+        const autoFixedCount = results.filter(r => r.hr && r.hr.autoFixed).length;
+
         let html = `
             <div class="ocr-summary">
                 <span class="ocr-badge ok">✅ Khớp: ${ok}</span>
                 <span class="ocr-badge diff">❌ Lệch: ${diff}</span>
                 <span class="ocr-badge missing">⚠️ Thiếu: ${missing}</span>
+                ${autoFixedCount > 0 ? `<span class="ocr-badge autofix">🔧 Tự sửa: ${autoFixedCount}</span>` : ''}
             </div>
             <p class="ocr-note">
                 💡 Ngưỡng: Vào ≤ <strong>${TOLERANCE_START_MINUTES}p (1h)</strong> ·
@@ -528,6 +741,19 @@ const OCRCompare = (function () {
                 ? `<span class="ocr-shift-badge night">🌙 Đêm</span>`
                 : `<span class="ocr-shift-badge day">☀️ Ngày</span>`;
 
+            // ═══ Badge tự sửa TC ═══
+            let autoFixBadge = '';
+            if (r.hr.autoFixed) {
+                const orig = r.hr.originalOT;
+                const newVal = r.hr.overtimeHours;
+                const conf = r.hr.fixConfidence;
+                const icon2 = conf === 'high' ? '🔧' : '⚠️';
+                autoFixBadge = `<span class="ocr-autofix-badge ${conf}" title="Tự sửa TC từ ${orig} → ${newVal}">${icon2} TC: ${orig}→${newVal}</span>`;
+            }
+            if (r.hr.needsReview) {
+                autoFixBadge += `<span class="ocr-review-badge" title="Cần kiểm tra TC, dự kiến ${r.hr.suggestedOT}">👁️ Review (dự kiến ${r.hr.suggestedOT}h)</span>`;
+            }
+
             html += `
                 <div class="ocr-card ${cardClass}">
                     <div class="ocr-card-head">
@@ -536,6 +762,7 @@ const OCRCompare = (function () {
                         <span class="ocr-card-type ${cls.type ? 'diff' : ''}">${r.hrIsSunday ? 'CN' : 'T'}</span>
                         <span class="ocr-card-status">${icon} ${statusText}</span>
                     </div>
+                    ${autoFixBadge ? `<div class="ocr-autofix-row">${autoFixBadge}</div>` : ''}
                     <div class="ocr-card-body">
                         <div class="ocr-row-head">
                             <span></span>
@@ -574,7 +801,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  9. HIỂN THỊ TEXT THÔ
+    //  10. HIỂN THỊ TEXT THÔ
     // ═══════════════════════════════════════════════════════════
     function renderRawText(text, hrRowsCount) {
         const el = document.getElementById('ocr-result');
@@ -595,7 +822,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  10. XUẤT ẢNH PNG
+    //  11. XUẤT ẢNH PNG
     // ═══════════════════════════════════════════════════════════
     async function exportImage() {
         if (!lastResults || lastResults.length === 0) {
@@ -669,6 +896,7 @@ const OCRCompare = (function () {
         const ok = results.filter(r => r.status === 'ok').length;
         const diff = results.filter(r => r.status === 'diff').length;
         const missing = results.filter(r => r.status === 'missing').length;
+        const autoFixed = results.filter(r => r.hr && r.hr.autoFixed).length;
 
         const now = new Date();
         const dateStr = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
@@ -686,7 +914,7 @@ const OCRCompare = (function () {
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <div style="font-size:20px; font-weight:800; color:#4F46E5;">📊 ĐỐI CHIẾU CÔNG HR</div>
-                        <div style="font-size:13px; color:#64748B; margin-top:3px;">${monthLabel}</div>
+                        <div style="font-size:13px; color:#64748B; margin-top:3px;">${monthLabel}${autoFixed > 0 ? ' · 🔧 Tự sửa: ' + autoFixed : ''}</div>
                     </div>
                     <div style="text-align:right;">
                         <div style="font-size:12px; color:#94A3B8;">Ngày xuất</div>
@@ -708,6 +936,11 @@ const OCRCompare = (function () {
                     <div style="font-size:11px; color:#92400E; font-weight:700;">THIẾU</div>
                     <div style="font-size:22px; font-weight:800; color:#D97706;">${missing}</div>
                 </div>
+                ${autoFixed > 0 ? `
+                <div style="flex:1; background:#E0E7FF; border-left:4px solid #6366F1; padding:10px 14px; border-radius:8px;">
+                    <div style="font-size:11px; color:#3730A3; font-weight:700;">🔧 TỰ SỬA</div>
+                    <div style="font-size:22px; font-weight:800; color:#4F46E5;">${autoFixed}</div>
+                </div>` : ''}
             </div>
 
             <table style="width:100%; border-collapse:collapse; font-size:13px; font-family:monospace;">
@@ -763,7 +996,7 @@ const OCRCompare = (function () {
             const hrOT = r.hr.overtimeHours != null ? String(r.hr.overtimeHours) : '—';
             const otMatch = r.fields && r.fields.ot !== false;
             const otColor = (r.appLog && !otMatch) ? '#DC2626' : '#1E293B';
-            const otIcon = r.appLog ? (otMatch ? ' ✓' : ' ✗') : '';
+            const otIcon = r.hr.autoFixed ? ' 🔧' : (r.appLog ? (otMatch ? ' ✓' : ' ✗') : '');
             const otCell = r.appLog ? `${appOT}→${hrOT}${otIcon}` : `${hrOT}`;
 
             const kqIcon = isOk ? '✅' : isDiff ? '❌' : '⚠️';
@@ -788,7 +1021,7 @@ const OCRCompare = (function () {
 
             <div style="margin-top:16px; padding-top:12px; border-top:1px solid #E2E8F0; font-size:11px; color:#64748B; line-height:1.6;">
                 <div>💡 Ngưỡng: Vào ≤ <strong>1 giờ</strong> · Ra ≤ <strong>15p</strong> · BT ≤ <strong>0.25h</strong> · TC ngày ≤ <strong>0.25h</strong> · TC đêm ≤ <strong>0.5h</strong></div>
-                <div style="margin-top:4px;">📱 TimeTracker · Đối chiếu tự động từ ảnh HR</div>
+                <div style="margin-top:4px;">📱 TimeTracker · Adaptive OCR Engine v6 ${autoFixed > 0 ? '· 🔧 ' + autoFixed + ' dòng tự sửa TC' : ''}</div>
             </div>
         </div>`;
 
@@ -796,7 +1029,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  11. PROGRESS
+    //  12. PROGRESS
     // ═══════════════════════════════════════════════════════════
     function showProgress() {
         document.getElementById('ocr-progress').style.display = 'block';
@@ -816,7 +1049,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  12. HÀM CHÍNH
+    //  13. HÀM CHÍNH
     // ═══════════════════════════════════════════════════════════
     async function processImage(file) {
         showProgress();
@@ -868,9 +1101,16 @@ const OCRCompare = (function () {
 
             const okCount = results.filter(r => r.status === 'ok').length;
             const diffCount = results.filter(r => r.status === 'diff').length;
+            const autoFixed = results.filter(r => r.hr && r.hr.autoFixed).length;
+
             if (typeof showToast === 'function') {
-                if (diffCount === 0) showToast(`✅ ${hrRows.length} ngày — tất cả khớp!`, 'success');
-                else showToast(`⚠️ ${okCount} khớp, ${diffCount} lệch`, 'warning');
+                if (diffCount === 0 && autoFixed === 0) {
+                    showToast(`✅ ${hrRows.length} ngày — tất cả khớp!`, 'success');
+                } else if (autoFixed > 0) {
+                    showToast(`⚠️ ${okCount} khớp, ${diffCount} lệch · 🔧 Tự sửa ${autoFixed} TC`, 'warning');
+                } else {
+                    showToast(`⚠️ ${okCount} khớp, ${diffCount} lệch`, 'warning');
+                }
             }
             setTimeout(hideProgress, 400);
             console.log('[OCR] === Xong ===');
@@ -902,7 +1142,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  13. XÓA
+    //  14. XÓA
     // ═══════════════════════════════════════════════════════════
     function clear() {
         const el = document.getElementById('ocr-result');
@@ -916,7 +1156,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  14. INIT
+    //  15. INIT
     // ═══════════════════════════════════════════════════════════
     function init() {
         const input = document.getElementById('hr-image-input');

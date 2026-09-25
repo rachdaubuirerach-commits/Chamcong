@@ -1700,3 +1700,83 @@ html.theme-changing * {
     min-height: 38px;
     padding: 7px 12px;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ADAPTIVE OCR v6 — Badge tự sửa TC
+   ═══════════════════════════════════════════════════════════════ */
+
+.ocr-badge.autofix {
+    background: linear-gradient(135deg, #E0E7FF, #C7D2FE);
+    color: #3730A3;
+}
+
+[data-theme="dark"] .ocr-badge.autofix {
+    background: rgba(99,102,241,0.25);
+    color: #A5B4FC;
+}
+
+.ocr-autofix-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+    padding: 4px 6px;
+    background: rgba(99,102,241,0.06);
+    border-radius: 6px;
+    border-left: 3px solid #6366F1;
+}
+
+.ocr-autofix-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    letter-spacing: 0.2px;
+    font-variant-numeric: tabular-nums;
+}
+.ocr-autofix-badge.high {
+    background: linear-gradient(135deg, #D1FAE5, #A7F3D0);
+    color: #065F46;
+    border: 1px solid #10B981;
+}
+.ocr-autofix-badge.medium {
+    background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+    color: #92400E;
+    border: 1px solid #F59E0B;
+}
+
+.ocr-review-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #FEE2E2, #FECACA);
+    color: #991B1B;
+    border: 1px solid #EF4444;
+    animation: ocrReviewPulse 1.8s ease-in-out infinite;
+}
+@keyframes ocrReviewPulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.03); }
+}
+
+[data-theme="dark"] .ocr-autofix-row {
+    background: rgba(99,102,241,0.12);
+}
+[data-theme="dark"] .ocr-autofix-badge.high {
+    background: rgba(16,185,129,0.2);
+    color: #6EE7B7;
+    border-color: #10B981;
+}
+[data-theme="dark"] .ocr-autofix-badge.medium {
+    background: rgba(245,158,11,0.2);
+    color: #FCD34D;
+    border-color: #F59E0B;
+}
+[data-theme="dark"] .ocr-review-badge {
+    background: rgba(239,68,68,0.2);
+    color: #FCA5A5;
+    border-color: #EF4444;
+}
