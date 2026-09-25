@@ -2,7 +2,7 @@
    sw.js — TimeTracker (Tesseract offline local)
    ═══════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION = 'v4.4.9';
+const CACHE_VERSION = 'v4.4.7';
 const CACHE_NAME = `timetracker-${CACHE_VERSION}`;
 
 const ASSETS = [
