@@ -1,18 +1,18 @@
 /* ═══════════════════════════════════════════════════════════════
-   ocr-compare.js — Adaptive OCR Engine v6 (Phase 1)
-   - Hỗ trợ iPhone (HEIC, ảnh lớn) + Android
+   ocr-compare.js — Adaptive OCR Engine v6 (Phase 1.5)
+   - Fix cross-browser: Chrome, Safari iOS, Samsung Internet, Huawei
+   - willReadFrequently: true → force CPU backend cho canvas
+   - Detect browser yếu → preprocessing đơn giản hơn
    - Mathematical Validation: tính TC dự kiến từ giờ vào/ra
-   - Candidate Generator: sinh nhiều khả năng từ raw OCR
-   - Auto-fix TC khi sai (dựa vào math + rules)
-   - Hiển thị badge tự sửa / cần review
+   - Candidate Generator + Auto-fix TC
    ═══════════════════════════════════════════════════════════════ */
 
 const OCRCompare = (function () {
     'use strict';
 
     // ═══ NGƯỠNG SAI SỐ ═══
-    const TOLERANCE_START_MINUTES = 60;   // Giờ vào: lệch tối đa 1 giờ
-    const TOLERANCE_END_MINUTES = 15;     // Giờ ra: lệch tối đa 15 phút
+    const TOLERANCE_START_MINUTES = 60;
+    const TOLERANCE_END_MINUTES = 15;
     const TOLERANCE_HOURS = 0.25;
     const TOLERANCE_OT_DAY = 0.25;
     const TOLERANCE_OT_NIGHT = 0.5;
@@ -33,11 +33,11 @@ const OCRCompare = (function () {
         [17 * 60, 21 * 60]
     ];
 
-    // ═══ GIỚI HẠN ẢNH CHO IPHONE SAFARI ═══
+    // ═══ GIỚI HẠN ẢNH ═══
     const MAX_IMAGE_DIMENSION = 3000;
     const MAX_IMAGE_PIXELS = 9000000;
 
-    // ═══ ADAPTIVE OCR ENGINE v6 — PHASE 1 CONSTANTS ═══
+    // ═══ ADAPTIVE ENGINE v6 CONSTANTS ═══
     const OCR_CHAR_MAP = {
         'S': '3', 's': '3',
         'O': '0', 'o': '0',
@@ -54,7 +54,33 @@ const OCRCompare = (function () {
         3, 3.25, 3.5, 3.75, 4, 4.25, 4.5, 4.75, 5
     ];
 
-    const OT_TOLERANCE = 0.5; // Ngưỡng lệch TC cho phép (giờ)
+    const OT_TOLERANCE = 0.5;
+
+    // ═══ DETECT TRÌNH DUYỆT ═══
+    const BROWSER = (function() {
+        const ua = navigator.userAgent;
+        return {
+            isSafari: /^((?!chrome|android).)*safari/i.test(ua),
+            isIOS: /iPad|iPhone|iPod/.test(ua) && !window.MSStream,
+            isSamsung: /SamsungBrowser/i.test(ua),
+            isHuawei: /HuaweiBrowser/i.test(ua),
+            isChrome: /Chrome/i.test(ua) && !/Edge|OPR|SamsungBrowser/i.test(ua),
+            isFirefox: /Firefox/i.test(ua),
+            isEdge: /Edg/i.test(ua)
+        };
+    })();
+
+    // Trình duyệt "yếu" cần preprocessing đơn giản
+    const IS_WEAK_BROWSER = BROWSER.isSamsung || BROWSER.isIOS;
+
+    console.log('[OCR] Browser detect:', {
+        safari: BROWSER.isSafari,
+        ios: BROWSER.isIOS,
+        samsung: BROWSER.isSamsung,
+        huawei: BROWSER.isHuawei,
+        chrome: BROWSER.isChrome,
+        weak: IS_WEAK_BROWSER
+    });
 
     let worker = null;
     let lastResults = null;
@@ -108,8 +134,8 @@ const OCRCompare = (function () {
         if (!isHeic) return file;
 
         if (typeof heic2any === 'undefined') {
-            console.warn('[OCR] heic2any chưa tải — không chuyển được HEIC');
-            throw new Error('Ảnh HEIC cần thư viện heic2any. Vui lòng chụp ảnh JPG hoặc tải lại trang.');
+            console.warn('[OCR] heic2any chưa tải');
+            throw new Error('Ảnh HEIC cần thư viện heic2any. Chụp ảnh JPG hoặc tải lại trang.');
         }
 
         console.log('[OCR] Phát hiện ảnh HEIC, đang chuyển sang JPG...');
@@ -134,7 +160,7 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  3. TIỀN XỬ LÝ ẢNH
+    //  3. TIỀN XỬ LÝ ẢNH (cross-browser safe)
     // ═══════════════════════════════════════════════════════════
     function preprocessImage(file) {
         return new Promise((resolve, reject) => {
@@ -145,53 +171,78 @@ const OCRCompare = (function () {
                 const maxDim = Math.max(img.width, img.height);
                 let scale = 1;
 
-                if (maxDim < 1000) scale = 2;
-                else if (maxDim < 2000) scale = 1.5;
-                else if (maxDim < 3000) scale = 1;
-                else scale = MAX_IMAGE_DIMENSION / maxDim;
+                // ═══ SCALE THÔNG MINH (an toàn cho mọi browser) ═══
+                // Giảm scale nếu browser yếu để tránh lỗi pixel
+                if (IS_WEAK_BROWSER) {
+                    // Browser yếu: giảm scale để canvas nhẹ hơn
+                    if (maxDim < 800) scale = 1.5;
+                    else if (maxDim < 1500) scale = 1.2;
+                    else if (maxDim < 2500) scale = 1;
+                    else scale = 2000 / maxDim;
+                } else {
+                    // Browser mạnh: scale như cũ
+                    if (maxDim < 1000) scale = 2;
+                    else if (maxDim < 2000) scale = 1.5;
+                    else if (maxDim < 3000) scale = 1;
+                    else scale = MAX_IMAGE_DIMENSION / maxDim;
+                }
 
                 let finalW = Math.round(img.width * scale);
                 let finalH = Math.round(img.height * scale);
                 let totalPixels = finalW * finalH;
 
-                if (totalPixels > MAX_IMAGE_PIXELS) {
-                    const ratio = Math.sqrt(MAX_IMAGE_PIXELS / totalPixels);
+                // Giới hạn pixel
+                const maxPixels = IS_WEAK_BROWSER ? 6000000 : MAX_IMAGE_PIXELS;
+                if (totalPixels > maxPixels) {
+                    const ratio = Math.sqrt(maxPixels / totalPixels);
                     finalW = Math.round(finalW * ratio);
                     finalH = Math.round(finalH * ratio);
                     scale = finalW / img.width;
                 }
 
                 console.log('[OCR] Ảnh gốc:', img.width, 'x', img.height);
-                console.log('[OCR] Scale:', scale.toFixed(2));
+                console.log('[OCR] Scale:', scale.toFixed(2), '(weak browser:', IS_WEAK_BROWSER + ')');
                 console.log('[OCR] Ảnh sau scale:', finalW, 'x', finalH, '(' + (finalW * finalH / 1000000).toFixed(1) + 'MP)');
 
                 canvas.width = finalW;
                 canvas.height = finalH;
-                const ctx = canvas.getContext('2d');
+
+                // ═══ CRITICAL: willReadFrequently: true ═══
+                // Force CPU backend → pixel chính xác 100% trên mọi browser
+                const ctx = canvas.getContext('2d', {
+                    willReadFrequently: true,
+                    alpha: false
+                });
 
                 ctx.imageSmoothingEnabled = true;
                 ctx.imageSmoothingQuality = 'high';
                 ctx.drawImage(img, 0, 0, finalW, finalH);
 
+                // ═══ GRAYSCALE + CONTRAST ═══
+                // Trên browser yếu: dùng contrast thấp hơn để tránh artifact
                 try {
                     const imageData = ctx.getImageData(0, 0, finalW, finalH);
                     const data = imageData.data;
-                    const contrast = 1.3;
+
+                    const contrast = IS_WEAK_BROWSER ? 1.15 : 1.3;
                     const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
 
                     for (let i = 0; i < data.length; i += 4) {
                         const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
                         const val = Math.max(0, Math.min(255, factor * (gray - 128) + 128));
                         data[i] = data[i + 1] = data[i + 2] = val;
+                        data[i + 3] = 255; // Alpha luôn 255
                     }
                     ctx.putImageData(imageData, 0, 0);
                 } catch (e) {
                     console.warn('[OCR] Preprocess skip:', e);
                 }
 
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                const format = isIOS ? 'image/jpeg' : 'image/png';
-                const quality = isIOS ? 0.92 : undefined;
+                // ═══ FORMAT OUTPUT ═══
+                // iOS: JPEG (nhẹ hơn), các browser khác: PNG (lossless)
+                const useJPEG = BROWSER.isIOS;
+                const format = useJPEG ? 'image/jpeg' : 'image/png';
+                const quality = useJPEG ? 0.92 : undefined;
 
                 canvas.toBlob((blob) => {
                     if (blob) {
@@ -358,17 +409,14 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  6. ADAPTIVE OCR ENGINE v6 — Helper Functions
+    //  6. ADAPTIVE OCR ENGINE — Helper Functions
     // ═══════════════════════════════════════════════════════════
 
-    // ═══ 6.1. Tính TC dự kiến từ giờ vào/ra ═══
     function calculateExpectedOT(gioVao, gioRa, loaiCa) {
         const startMin = timeToMinutes(gioVao);
         const endMin = timeToMinutes(gioRa);
         if (startMin === null || endMin === null) return null;
 
-        // Ca đêm: TC bắt đầu từ 04:30 hôm sau
-        // Ca sáng: TC bắt đầu từ 16:30 cùng ngày
         const tcStart = loaiCa === 'Đêm' ? (4 * 60 + 30) : (16 * 60 + 30);
 
         let realEnd = endMin;
@@ -380,27 +428,21 @@ const OCRCompare = (function () {
 
         let ot = (realEnd - tcStart) / 60;
 
-        // Thưởng 0.5h nếu TC >= 3
         if (ot >= 3) ot += 0.5;
-
-        // Phụ cấp đêm 0.25h
         if (loaiCa === 'Đêm' && ot > 0) ot += 0.25;
 
         return Math.round(ot * 100) / 100;
     }
 
-    // ═══ 6.2. Sinh candidate từ raw OCR text ═══
     function generateCandidates(rawText) {
         if (!rawText) return [];
 
         const candidates = new Set();
         const raw = String(rawText).trim();
 
-        // Candidate 1: Raw as-is
         const rawNum = parseFloat(raw.replace(',', '.'));
         if (!isNaN(rawNum) && rawNum >= 0) candidates.add(rawNum);
 
-        // Candidate 2: Map ký tự lỗi OCR
         let mapped = raw;
         for (const [from, to] of Object.entries(OCR_CHAR_MAP)) {
             mapped = mapped.split(from).join(to);
@@ -408,19 +450,16 @@ const OCRCompare = (function () {
         const mappedNum = parseFloat(mapped.replace(',', '.'));
         if (!isNaN(mappedNum) && mappedNum >= 0) candidates.add(mappedNum);
 
-        // Candidate 3: Chỉ lấy số + dấu chấm
         const digitsOnly = raw.replace(/[^0-9.]/g, '');
         const digitsNum = parseFloat(digitsOnly);
         if (!isNaN(digitsNum) && digitsNum >= 0) candidates.add(digitsNum);
 
-        // Candidate 4: Nếu có 3 chữ số liền "375" → "3.75", "37.5"
         const digits = raw.replace(/[^0-9]/g, '');
         if (digits.length === 3) {
             candidates.add(parseFloat(digits[0] + '.' + digits.slice(1)));
             candidates.add(parseFloat(digits.slice(0, 2) + '.' + digits.slice(2)));
         }
 
-        // Candidate 5: Nhân/chia 10
         if (!isNaN(rawNum) && rawNum > 0) {
             if (rawNum > 20) candidates.add(Math.round(rawNum / 10 * 100) / 100);
             if (rawNum < 0.5 && rawNum > 0) candidates.add(Math.round(rawNum * 10 * 100) / 100);
@@ -429,7 +468,6 @@ const OCRCompare = (function () {
         return [...candidates].filter(c => c >= 0 && c <= 12);
     }
 
-    // ═══ 6.3. Chọn candidate tốt nhất dựa vào expected ═══
     function pickBestCandidate(candidates, expected) {
         if (candidates.length === 0) return null;
 
@@ -454,7 +492,6 @@ const OCRCompare = (function () {
         return best;
     }
 
-    // ═══ 6.4. Validate + Auto-fix TC cho 1 record ═══
     function validateAndFixOT(record) {
         const result = {
             fixed: false,
@@ -466,23 +503,16 @@ const OCRCompare = (function () {
             candidates: []
         };
 
-        // Chỉ fix ca đêm (ca sáng ít bị lỗi hơn)
         if (record.shift !== 'Đêm') return result;
-
-        // Chỉ fix khi TC > 0
         if (!record.overtimeHours || record.overtimeHours <= 0) return result;
 
-        // Tính TC dự kiến
         const expected = calculateExpectedOT(record.start, record.end, record.shift);
         if (expected === null) return result;
 
         result.expected = expected;
 
-        // Nếu TC khớp với dự kiến → OK
         const diff = Math.abs(record.overtimeHours - expected);
-        if (diff <= OT_TOLERANCE) {
-            return result;
-        }
+        if (diff <= OT_TOLERANCE) return result;
 
         console.log(`[OCR] TC sai cho ${record.date}: ${record.overtimeHours} vs expected ${expected} (lệch ${diff.toFixed(2)}h)`);
 
@@ -502,18 +532,16 @@ const OCRCompare = (function () {
             result.fixed = true;
             result.newValue = best;
             result.confidence = 'high';
-            result.reason = `Tự sửa từ ${record.overtimeHours} → ${best} (expected ${expected})`;
+            result.reason = `Tự sửa từ ${record.overtimeHours} → ${best}`;
             console.log(`[OCR] ✅ Tự sửa TC: ${record.overtimeHours} → ${best}`);
         } else if (bestDiff <= OT_TOLERANCE * 2) {
             result.fixed = true;
             result.newValue = best;
             result.confidence = 'medium';
             result.reason = `Sửa nhưng chưa chắc: ${record.overtimeHours} → ${best}`;
-            console.log(`[OCR] ⚠️ Sửa TC (không chắc): ${record.overtimeHours} → ${best}`);
         } else {
             result.confidence = 'low';
             result.reason = `TC lệch ${diff.toFixed(2)}h, không fix được`;
-            console.log(`[OCR] ❌ Không fix được TC: ${record.overtimeHours} vs expected ${expected}`);
         }
 
         return result;
@@ -581,13 +609,12 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  8. SO SÁNH (có Adaptive Validation)
+    //  8. SO SÁNH
     // ═══════════════════════════════════════════════════════════
     function compareWithApp(hrRows, workLogs) {
         const cleanedRows = cleanHrRows(hrRows);
 
-        // ═══ ADAPTIVE ENGINE v6 — Validate + Auto-fix TC ═══
-        console.log('[OCR] === Bắt đầu Adaptive Validation ===');
+        console.log('[OCR] === Adaptive Validation ===');
         const fixStats = { total: 0, fixed: 0, uncertain: 0, failed: 0 };
 
         for (const hr of cleanedRows) {
@@ -608,10 +635,8 @@ const OCRCompare = (function () {
             }
         }
 
-        console.log(`[OCR] Validation stats: ${fixStats.fixed} tự sửa chắc, ${fixStats.uncertain} sửa không chắc, ${fixStats.failed} không sửa được, tổng ${fixStats.total}`);
-        console.log('[OCR] === Kết thúc Adaptive Validation ===');
+        console.log(`[OCR] Stats: ${fixStats.fixed} sửa chắc, ${fixStats.uncertain} không chắc, ${fixStats.failed} không sửa được, tổng ${fixStats.total}`);
 
-        // ═══ SO SÁNH ═══
         const results = [];
         for (const hr of cleanedRows) {
             const appLog = workLogs.find(l => l.date === hr.date);
@@ -661,18 +686,26 @@ const OCRCompare = (function () {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  9. HIỂN THỊ KẾT QUẢ (có badge tự sửa)
+    //  9. HIỂN THỊ KẾT QUẢ
     // ═══════════════════════════════════════════════════════════
     function renderResults(results, rawText) {
         const el = document.getElementById('ocr-result');
         const ok = results.filter(r => r.status === 'ok').length;
         const diff = results.filter(r => r.status === 'diff').length;
         const missing = results.filter(r => r.status === 'missing').length;
-
-        // Đếm số tự sửa
         const autoFixedCount = results.filter(r => r.hr && r.hr.autoFixed).length;
 
-        let html = `
+        // Cảnh báo trình duyệt yếu
+        let browserWarning = '';
+        if (IS_WEAK_BROWSER) {
+            const browserName = BROWSER.isSamsung ? 'Samsung Internet' : (BROWSER.isIOS ? 'Safari iOS' : 'Trình duyệt này');
+            browserWarning = `
+                <div style="background:#FEF3C7;border:1.5px solid #F59E0B;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#92400E;">
+                    ⚠️ <strong>${browserName}</strong> có thể đọc kém chính xác hơn. Nếu kết quả sai nhiều, hãy dùng <strong>Chrome</strong> hoặc trình duyệt khác.
+                </div>`;
+        }
+
+        let html = browserWarning + `
             <div class="ocr-summary">
                 <span class="ocr-badge ok">✅ Khớp: ${ok}</span>
                 <span class="ocr-badge diff">❌ Lệch: ${diff}</span>
@@ -741,7 +774,6 @@ const OCRCompare = (function () {
                 ? `<span class="ocr-shift-badge night">🌙 Đêm</span>`
                 : `<span class="ocr-shift-badge day">☀️ Ngày</span>`;
 
-            // ═══ Badge tự sửa TC ═══
             let autoFixBadge = '';
             if (r.hr.autoFixed) {
                 const orig = r.hr.originalOT;
@@ -891,7 +923,6 @@ const OCRCompare = (function () {
         }
     }
 
-    // ═══ BUILD HTML CHO ẢNH XUẤT ═══
     function buildExportHTML(results) {
         const ok = results.filter(r => r.status === 'ok').length;
         const diff = results.filter(r => r.status === 'diff').length;
@@ -1058,9 +1089,6 @@ const OCRCompare = (function () {
             console.log('[OCR] File gốc:', file.name, file.size, 'bytes, type:', file.type);
 
             const processedFile = await convertHeicIfNeeded(file);
-            if (processedFile !== file) {
-                console.log('[OCR] Đã xử lý HEIC, file mới:', processedFile.name, processedFile.size);
-            }
 
             updateProgress(5, 'Đang xử lý ảnh...');
             const processedBlob = await preprocessImage(processedFile);
