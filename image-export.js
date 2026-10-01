@@ -1,5 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════
-   image-export.js v3.3 — Xuất PNG (tối ưu memory + tốc độ)
+   image-export.js v4.2 — Xuất PNG (Monochrome V1)
+   Header đen đặc, không gradient
    ═══════════════════════════════════════════════════════════════ */
 
 const ImageExporter = (function () {
@@ -31,30 +32,24 @@ const ImageExporter = (function () {
             if (rows[i].type === 'Chủ nhật') totalSunDays++;
         }
 
-        const themeColor = getComputedStyle(document.documentElement)
-            .getPropertyValue('--primary').trim() || '#4F46E5';
-        const themeLight = getComputedStyle(document.documentElement)
-            .getPropertyValue('--primary-light').trim() || '#818CF8';
-
         const rowsArr = [];
         for (let i = 0; i < rows.length; i++) {
             const r = rows[i];
             const isSunday = r.type === 'Chủ nhật';
             const rowStyle = isSunday
-                ? 'background:linear-gradient(90deg, #FEF3C7, #FDE68A);font-weight:700;'
-                : (i % 2 === 0 ? 'background:#FFFFFF;' : 'background:#F8FAFC;');
-            const dateStyle = isSunday ? 'color:#B45309;font-weight:800;' : 'color:#334155;';
-            const shiftStyle = isSunday ? 'color:#B45309;font-weight:800;' : 'color:#334155;';
-            const otStyle = isSunday ? 'color:#DC2626;font-weight:800;' : 'color:#334155;';
+                ? 'background:#FEF9C3;font-weight:700;'
+                : (i % 2 === 0 ? 'background:#FFFFFF;' : 'background:#FAFAFA;');
+            const dateStyle = isSunday ? 'color:#713F12;font-weight:800;' : 'color:#404040;';
+            const otStyle = isSunday ? 'color:#DC2626;font-weight:800;' : 'color:#404040;';
 
             rowsArr.push(`
                 <tr style="${rowStyle}">
-                    <td style="padding:10px 8px;border:1px solid #E2E8F0;font-size:13px;text-align:center;${dateStyle}">${escapeHtml(r.date)}</td>
-                    <td style="padding:10px 8px;border:1px solid #E2E8F0;font-size:13px;text-align:center;${shiftStyle}">${escapeHtml(r.shift)}</td>
-                    <td style="padding:10px 8px;border:1px solid #E2E8F0;font-size:13px;text-align:center;color:#334155;">${escapeHtml(r.start)}</td>
-                    <td style="padding:10px 8px;border:1px solid #E2E8F0;font-size:13px;text-align:center;color:#334155;">${escapeHtml(r.end)}</td>
-                    <td style="padding:10px 8px;border:1px solid #E2E8F0;font-size:13px;text-align:center;${otStyle}">${escapeHtml(r.ot)}</td>
-                    <td style="padding:10px 8px;border:1px solid #E2E8F0;font-size:13px;text-align:left;color:#334155;">${escapeHtml(r.note || '')}</td>
+                    <td style="padding:10px 8px;border:1px solid #E5E5E5;font-size:13px;text-align:center;${dateStyle}">${escapeHtml(r.date)}</td>
+                    <td style="padding:10px 8px;border:1px solid #E5E5E5;font-size:13px;text-align:center;color:#404040;">${escapeHtml(r.shift)}</td>
+                    <td style="padding:10px 8px;border:1px solid #E5E5E5;font-size:13px;text-align:center;color:#404040;">${escapeHtml(r.start)}</td>
+                    <td style="padding:10px 8px;border:1px solid #E5E5E5;font-size:13px;text-align:center;color:#404040;">${escapeHtml(r.end)}</td>
+                    <td style="padding:10px 8px;border:1px solid #E5E5E5;font-size:13px;text-align:center;${otStyle}">${escapeHtml(r.ot)}</td>
+                    <td style="padding:10px 8px;border:1px solid #E5E5E5;font-size:13px;text-align:left;color:#404040;">${escapeHtml(r.note || '')}</td>
                 </tr>
             `);
         }
@@ -62,11 +57,11 @@ const ImageExporter = (function () {
 
         const html = `
             <div style="width:1200px;background:#FFFFFF;font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,'Roboto','Helvetica Neue',Arial,sans-serif;padding:0;box-sizing:border-box;">
-                <div style="background:linear-gradient(135deg,${themeColor} 0%,${themeLight} 100%);padding:28px 40px;color:white;text-align:center;">
-                    <div style="font-size:32px;font-weight:800;letter-spacing:1.5px;margin-bottom:8px;text-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                <div style="background:#000000;padding:28px 40px;color:#FFFFFF;text-align:center;">
+                    <div style="font-size:32px;font-weight:800;letter-spacing:1.5px;margin-bottom:8px;">
                         BẢNG CHẤM CÔNG
                     </div>
-                    <div style="font-size:14px;opacity:0.95;font-weight:500;">
+                    <div style="font-size:14px;opacity:0.75;font-weight:500;">
                         Tháng ${String(month).padStart(2, '0')}/${year}  ·  
                         Ngày công chuẩn: ${settings.standardWorkDays}
                     </div>
@@ -75,13 +70,13 @@ const ImageExporter = (function () {
                 <div style="padding:24px 40px;">
                     <table style="width:100%;border-collapse:collapse;font-family:inherit;">
                         <thead>
-                            <tr style="background:${themeColor};color:white;">
-                                <th style="padding:12px 8px;border:1px solid ${themeColor};font-size:13px;font-weight:700;text-align:center;">Ngày</th>
-                                <th style="padding:12px 8px;border:1px solid ${themeColor};font-size:13px;font-weight:700;text-align:center;">Ca</th>
-                                <th style="padding:12px 8px;border:1px solid ${themeColor};font-size:13px;font-weight:700;text-align:center;">Vào</th>
-                                <th style="padding:12px 8px;border:1px solid ${themeColor};font-size:13px;font-weight:700;text-align:center;">Ra</th>
-                                <th style="padding:12px 8px;border:1px solid ${themeColor};font-size:13px;font-weight:700;text-align:center;">Tăng ca</th>
-                                <th style="padding:12px 8px;border:1px solid ${themeColor};font-size:13px;font-weight:700;text-align:left;">Ghi chú</th>
+                            <tr style="background:#171717;color:#FAFAFA;">
+                                <th style="padding:12px 8px;border:1px solid #171717;font-size:13px;font-weight:700;text-align:center;">Ngày</th>
+                                <th style="padding:12px 8px;border:1px solid #171717;font-size:13px;font-weight:700;text-align:center;">Ca</th>
+                                <th style="padding:12px 8px;border:1px solid #171717;font-size:13px;font-weight:700;text-align:center;">Vào</th>
+                                <th style="padding:12px 8px;border:1px solid #171717;font-size:13px;font-weight:700;text-align:center;">Ra</th>
+                                <th style="padding:12px 8px;border:1px solid #171717;font-size:13px;font-weight:700;text-align:center;">Tăng ca</th>
+                                <th style="padding:12px 8px;border:1px solid #171717;font-size:13px;font-weight:700;text-align:left;">Ghi chú</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -90,24 +85,24 @@ const ImageExporter = (function () {
                     </table>
 
                     ${totalSunDays > 0 ? `
-                        <div style="margin-top:14px;font-size:13px;color:#92400E;background:#FEF3C7;padding:10px 16px;border-radius:10px;border-left:4px solid #F59E0B;">
+                        <div style="margin-top:14px;font-size:13px;color:#713F12;background:#FEF9C3;padding:10px 16px;border-radius:10px;border-left:4px solid #CA8A04;">
                             🟡 <strong>${totalSunDays} ngày Chủ nhật</strong> — nền vàng, chữ đậm
                         </div>
                     ` : ''}
                 </div>
 
-                <div style="margin:0 40px 24px;background:#F5F7FC;border-radius:14px;padding:22px 28px;">
-                    <div style="font-size:17px;font-weight:800;color:${themeColor};margin-bottom:14px;letter-spacing:0.5px;">
+                <div style="margin:0 40px 24px;background:#F5F5F5;border-radius:14px;padding:22px 28px;border:1px solid #E5E5E5;">
+                    <div style="font-size:17px;font-weight:800;color:#000000;margin-bottom:14px;letter-spacing:0.5px;">
                         TỔNG KẾT
                     </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;font-size:14px;color:#334155;">
-                        <div>📅 Tổng ngày công: <strong style="color:#0F172A;">${rows.length} ngày</strong></div>
-                        <div>⏰ Tổng giờ thường: <strong style="color:#0F172A;">${totalRegH.toFixed(2)} h</strong></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;font-size:14px;color:#404040;">
+                        <div>📅 Tổng ngày công: <strong style="color:#000000;">${rows.length} ngày</strong></div>
+                        <div>⏰ Tổng giờ thường: <strong style="color:#000000;">${totalRegH.toFixed(2)} h</strong></div>
                         <div>⚡ Tổng giờ tăng ca: <strong style="color:#DC2626;">${totalOtH.toFixed(2)} h</strong></div>
                     </div>
                 </div>
 
-                <div style="padding:14px 40px 22px;text-align:center;color:#94A3B8;font-size:12px;border-top:1px solid #E2E8F0;">
+                <div style="padding:14px 40px 22px;text-align:center;color:#737373;font-size:12px;border-top:1px solid #E5E5E5;">
                     TimeTracker v${appVersion}  ·  Xuất ngày: ${new Date().toLocaleDateString('vi-VN')}
                 </div>
             </div>

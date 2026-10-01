@@ -1,29 +1,23 @@
 /* ═══════════════════════════════════════════════════════════════
-   style-effects.css — Hiệu ứng nâng cao cho TimeTracker
-   File này bổ sung thêm hiệu ứng mà style.css chưa có
+   style-effects.css v4.2 — Hiệu ứng nâng cao (Monochrome V1)
+   Đã bỏ tất cả glow màu, chuyển sang đơn sắc
    ═══════════════════════════════════════════════════════════════ */
 
-/* ═══════════════════════════════════════════════════════════════
-   1. NUMBER COUNT-UP — Số liệu nhảy khi update
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 1. COUNT-UP ═══ */
 .count-up {
     display: inline-block;
     transition: color 0.3s var(--ease-spring);
 }
-
 .count-up.counting {
     animation: countPulse 0.4s var(--ease-spring);
 }
-
 @keyframes countPulse {
     0% { transform: scale(1); }
-    50% { transform: scale(1.1); color: var(--primary); }
+    50% { transform: scale(1.1); }
     100% { transform: scale(1); }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   2. CHECKMARK — Hiệu ứng tick xanh khi chấm công thành công
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 2. CHECKMARK ═══ */
 .checkmark-container {
     position: fixed;
     top: 50%;
@@ -32,111 +26,68 @@
     z-index: 99999;
     pointer-events: none;
 }
-
 .checkmark-circle {
     width: 120px;
     height: 120px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #34D399, #10B981);
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 20px 60px rgba(16, 185, 129, 0.5);
     animation: checkmarkPop 1s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
 .checkmark-circle svg {
     width: 70px;
     height: 70px;
 }
-
 .checkmark-circle path {
     stroke-dasharray: 100;
     stroke-dashoffset: 100;
     animation: checkmarkDraw 0.6s ease-out 0.3s forwards;
 }
-
 @keyframes checkmarkPop {
-    0% {
-        transform: scale(0) rotate(-180deg);
-        opacity: 0;
-    }
-    50% {
-        transform: scale(1.15) rotate(10deg);
-        opacity: 1;
-    }
-    100% {
-        transform: scale(1) rotate(0deg);
-        opacity: 1;
-    }
+    0% { transform: scale(0) rotate(-180deg); opacity: 0; }
+    50% { transform: scale(1.15) rotate(10deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
 }
-
 @keyframes checkmarkDraw {
     to { stroke-dashoffset: 0; }
 }
-
 .checkmark-circle.fade-out {
     animation: checkmarkFadeOut 0.4s ease-out forwards;
 }
-
 @keyframes checkmarkFadeOut {
-    to {
-        transform: scale(1.3);
-        opacity: 0;
-    }
+    to { transform: scale(1.3); opacity: 0; }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   3. CARD GLOW — Card phát sáng khi focus
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 3. CARD GLOW — bỏ màu, chỉ viền sáng ═══ */
 .card.glow {
     box-shadow:
-        0 0 20px var(--primary-glow),
-        0 20px 60px rgba(99, 102, 241, 0.15);
-    border-color: var(--primary-light);
+        0 0 0 1px var(--gray-900),
+        0 8px 32px rgba(0,0,0,0.12);
+    border-color: var(--gray-900);
     animation: cardGlow 0.6s ease-out;
 }
-
+[data-theme="dark"] .card.glow {
+    box-shadow:
+        0 0 0 1px var(--gray-100),
+        0 8px 32px rgba(0,0,0,0.5);
+    border-color: var(--gray-100);
+}
 @keyframes cardGlow {
     0% { box-shadow: 0 0 0 transparent; }
-    50% { box-shadow: 0 0 30px var(--primary-glow), 0 20px 60px rgba(99, 102, 241, 0.25); }
-    100% { box-shadow: 0 0 20px var(--primary-glow), 0 20px 60px rgba(99, 102, 241, 0.15); }
+    50% { box-shadow: 0 0 0 2px var(--gray-900), 0 8px 32px rgba(0,0,0,0.18); }
+    100% { box-shadow: 0 0 0 1px var(--gray-900), 0 8px 32px rgba(0,0,0,0.12); }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   4. HERO SHIMMER — Ánh sáng lướt trên hero card
-   ═══════════════════════════════════════════════════════════════ */
-.hero-card::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(255, 255, 255, 0.15),
-        transparent
-    );
-    animation: heroShimmer 4s ease-in-out infinite;
-    pointer-events: none;
-}
+/* ═══ 4. HERO SHIMMER — bỏ, hero không còn gradient ═══ */
+.hero-card::after { display: none; }
 
-@keyframes heroShimmer {
-    0% { left: -100%; }
-    50%, 100% { left: 200%; }
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   5. LOADING DOTS — Dấu chấm loading
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 5. LOADING DOTS ═══ */
 .loading-dots {
     display: inline-flex;
     gap: 6px;
     align-items: center;
 }
-
 .loading-dots span {
     width: 8px;
     height: 8px;
@@ -144,28 +95,22 @@
     background: currentColor;
     animation: dotBounce 1.4s ease-in-out infinite both;
 }
-
 .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
 .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
 .loading-dots span:nth-child(3) { animation-delay: 0s; }
-
 @keyframes dotBounce {
     0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
     40% { transform: scale(1); opacity: 1; }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   6. TAB INDICATOR — Đường nằm dưới tab đang chọn
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 6. TAB INDICATOR — đơn sắc ═══ */
 .cal-mode-tabs {
     position: relative;
 }
-
 .cal-mode-tabs button {
     position: relative;
     z-index: 1;
 }
-
 .cal-mode-tabs button.active::before {
     content: "";
     position: absolute;
@@ -175,55 +120,45 @@
     width: 30%;
     height: 3px;
     border-radius: 2px;
-    background: var(--primary-gradient);
+    background: var(--gray-900);
     animation: tabIndicator 0.4s var(--ease-spring);
 }
-
+[data-theme="dark"] .cal-mode-tabs button.active::before {
+    background: var(--gray-100);
+}
 @keyframes tabIndicator {
-    from {
-        width: 0;
-        opacity: 0;
-    }
-    to {
-        width: 30%;
-        opacity: 1;
-    }
+    from { width: 0; opacity: 0; }
+    to { width: 30%; opacity: 1; }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   7. AVATAR PULSE — Profile avatar có vòng sáng
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 7. AVATAR PULSE — đơn sắc ═══ */
 .profile-item.active .profile-avatar {
     animation: avatarPulse 2s ease-out infinite;
 }
-
 @keyframes avatarPulse {
-    0% {
-        box-shadow: 0 0 0 0 var(--primary);
-    }
-    70% {
-        box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
-    }
+    0% { box-shadow: 0 0 0 0 var(--gray-900); }
+    70% { box-shadow: 0 0 0 10px rgba(0, 0, 0, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+}
+[data-theme="dark"] .profile-item.active .profile-avatar {
+    animation: avatarPulseDark 2s ease-out infinite;
+}
+@keyframes avatarPulseDark {
+    0% { box-shadow: 0 0 0 0 var(--gray-100); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   8. BADGE PULSE — Badge lễ nhấp nháy
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 8. BADGE PULSE ═══ */
 .holiday-badge {
     animation: badgeBounce 3s ease-in-out infinite;
 }
-
 @keyframes badgeBounce {
     0%, 100% { transform: translateY(0) scale(1); }
     50% { transform: translateY(-2px) scale(1.1); }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   9. FAB TOOLTIP — Chữ nổi khi hover FAB
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 9. FAB TOOLTIP ═══ */
 .fab::after {
     content: "Chấm công";
     position: absolute;
@@ -231,7 +166,7 @@
     top: 50%;
     transform: translateY(-50%) scale(0);
     background: var(--gray-900);
-    color: white;
+    color: var(--gray-50);
     padding: 6px 12px;
     border-radius: 8px;
     font-size: 12px;
@@ -243,7 +178,10 @@
     transform-origin: right center;
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
-
+[data-theme="dark"] .fab::after {
+    background: var(--gray-100);
+    color: var(--gray-900);
+}
 @media (hover: hover) and (pointer: fine) {
     .fab:hover::after {
         transform: translateY(-50%) scale(1);
@@ -251,14 +189,11 @@
     }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   10. RIPPLE CHO STAT CARD — Hiệu ứng đặc biệt
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 10. STAT CARD RIPPLE — đơn sắc ═══ */
 .stat-card {
     position: relative;
     overflow: hidden;
 }
-
 .stat-card::before {
     content: "";
     position: absolute;
@@ -267,49 +202,43 @@
     width: 0;
     height: 0;
     border-radius: 50%;
-    background: radial-gradient(circle, var(--primary-glow), transparent 70%);
+    background: radial-gradient(circle, rgba(0,0,0,0.10), transparent 70%);
     transform: translate(-50%, -50%);
     transition: width 0.6s, height 0.6s;
     pointer-events: none;
     opacity: 0;
 }
-
+[data-theme="dark"] .stat-card::before {
+    background: radial-gradient(circle, rgba(255,255,255,0.10), transparent 70%);
+}
 .stat-card:active::before {
     width: 300px;
     height: 300px;
     opacity: 1;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   11. GLASS BLUR TOGGLE — Hiệu ứng mờ khi bật/tắt
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 11. TOGGLE ═══ */
 .toggle-input:checked {
     animation: toggleOn 0.4s var(--ease-spring);
 }
-
 @keyframes toggleOn {
     0% { transform: scale(1); }
     50% { transform: scale(1.1); }
     100% { transform: scale(1); }
 }
-
 .toggle-input:not(:checked) {
     animation: toggleOff 0.3s var(--ease-out);
 }
-
 @keyframes toggleOff {
     0% { transform: scale(1.05); }
     100% { transform: scale(1); }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   12. INPUT SHAKE — Rung khi validate lỗi
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 12. INPUT SHAKE ═══ */
 .form-control.error {
     border-color: var(--danger);
     animation: inputShake 0.4s ease-out;
 }
-
 @keyframes inputShake {
     0%, 100% { transform: translateX(0); }
     20% { transform: translateX(-8px); }
@@ -318,9 +247,7 @@
     80% { transform: translateX(6px); }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   13. LEGEND ITEM HOVER — Chú thích sáng lên
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 13. LEGEND HOVER ═══ */
 @media (hover: hover) {
     .legend-item {
         transition: transform 0.2s var(--ease-spring);
@@ -337,9 +264,7 @@
     }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   14. TABLE ROW — Dòng bảng nổi lên khi hover
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 14. TABLE ROW ═══ */
 @media (hover: hover) {
     tbody tr {
         transition: all 0.2s var(--ease-out);
@@ -351,51 +276,35 @@
     }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   15. CHART BAR — Cột biểu đồ mọc lên
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 15. CHART BAR — đơn sắc ═══ */
 .chart-container svg rect {
     transform-origin: bottom;
     animation: barGrow 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
-
 .chart-container svg rect:nth-child(1) { animation-delay: 0.02s; }
 .chart-container svg rect:nth-child(2) { animation-delay: 0.04s; }
 .chart-container svg rect:nth-child(3) { animation-delay: 0.06s; }
 .chart-container svg rect:nth-child(n+4) { animation-delay: 0.08s; }
-
 @keyframes barGrow {
-    from {
-        transform: scaleY(0);
-        opacity: 0;
-    }
-    to {
-        transform: scaleY(1);
-        opacity: 1;
-    }
+    from { transform: scaleY(0); opacity: 0; }
+    to { transform: scaleY(1); opacity: 1; }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   16. STAT MINI ITEM — Nhấp nhô khi mới update
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 16. STAT MINI ═══ */
 .stat-mini {
     transition: all 0.3s var(--ease-spring);
 }
-
 .stat-mini:hover {
     transform: translateY(-2px) scale(1.02);
     box-shadow: 0 6px 20px rgba(0,0,0,0.08);
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   17. CONFETTI — Bắn tung khi đạt mục tiêu
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 17. CONFETTI BURST ═══ */
 .confetti-burst {
     position: fixed;
     pointer-events: none;
     z-index: 99999;
 }
-
 .confetti-piece {
     position: absolute;
     width: 10px;
@@ -403,25 +312,15 @@
     border-radius: 2px;
     animation: confettiBurst 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
-
 @keyframes confettiBurst {
-    0% {
-        transform: translate(0, 0) rotate(0deg);
-        opacity: 1;
-    }
-    100% {
-        transform: translate(var(--tx), var(--ty)) rotate(720deg);
-        opacity: 0;
-    }
+    0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+    100% { transform: translate(var(--tx), var(--ty)) rotate(720deg); opacity: 0; }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   18. HEARTBEAT — Nhấp nhô như tim đập (cho item quan trọng)
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 18. HEARTBEAT ═══ */
 .heartbeat {
     animation: heartbeat 1.5s ease-in-out infinite;
 }
-
 @keyframes heartbeat {
     0%, 100% { transform: scale(1); }
     25% { transform: scale(1.08); }
@@ -429,67 +328,35 @@
     75% { transform: scale(1.05); }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   19. FLIP — Lật thẻ khi đổi theme
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 19. FLIP ═══ */
 .flip-in {
     animation: flipIn 0.6s var(--ease-spring);
 }
-
 @keyframes flipIn {
-    0% {
-        transform: rotateY(90deg);
-        opacity: 0;
-    }
-    100% {
-        transform: rotateY(0deg);
-        opacity: 1;
-    }
+    0% { transform: rotateY(90deg); opacity: 0; }
+    100% { transform: rotateY(0deg); opacity: 1; }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   20. BOUNCE IN — Nội dung nhảy vào
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 20. BOUNCE IN ═══ */
 .bounce-in {
     animation: bounceIn 0.6s var(--ease-spring);
 }
-
 @keyframes bounceIn {
-    0% {
-        transform: scale(0);
-        opacity: 0;
-    }
-    50% {
-        transform: scale(1.1);
-        opacity: 1;
-    }
-    100% {
-        transform: scale(1);
-        opacity: 1;
-    }
+    0% { transform: scale(0); opacity: 0; }
+    50% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   21. FADE SLIDE UP
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 21. FADE SLIDE UP ═══ */
 .fade-slide-up {
     animation: fadeSlideUp 0.4s var(--ease-out);
 }
-
 @keyframes fadeSlideUp {
-    from {
-        opacity: 0;
-        transform: translateY(12px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   22. SHIMMER LOADING
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 22. SHIMMER LOADING — đơn sắc ═══ */
 .shimmer {
     background: linear-gradient(
         90deg,
@@ -501,61 +368,44 @@
     animation: shimmer 1.5s linear infinite;
     border-radius: var(--r-sm);
 }
-
 @keyframes shimmer {
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   23. PULSE RING — Vòng tròn pulse quanh element
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 23. PULSE RING — đơn sắc ═══ */
 .pulse-ring {
     position: relative;
 }
-
 .pulse-ring::before,
 .pulse-ring::after {
     content: "";
     position: absolute;
     inset: -4px;
     border-radius: inherit;
-    border: 2px solid var(--primary);
+    border: 2px solid var(--gray-900);
     opacity: 0;
     animation: pulseRing 2s ease-out infinite;
 }
-
+[data-theme="dark"] .pulse-ring::before,
+[data-theme="dark"] .pulse-ring::after {
+    border-color: var(--gray-100);
+}
 .pulse-ring::after {
     animation-delay: 1s;
 }
-
 @keyframes pulseRing {
-    0% {
-        transform: scale(1);
-        opacity: 0.6;
-    }
-    100% {
-        transform: scale(1.3);
-        opacity: 0;
-    }
+    0% { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(1.3); opacity: 0; }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   24. TEXT GLOW — Chữ phát sáng
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 24. TEXT GLOW — bỏ, không còn glow ═══ */
 .text-glow {
-    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
-    animation: textGlow 2s ease-in-out infinite;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    animation: none;
 }
 
-@keyframes textGlow {
-    0%, 100% { text-shadow: 0 0 10px currentColor; }
-    50% { text-shadow: 0 0 20px currentColor, 0 0 30px currentColor; }
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   25. SMOOTH THEME CHANGE — Đổi theme mượt
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 25. SMOOTH THEME CHANGE ═══ */
 html.theme-changing body,
 html.theme-changing .card,
 html.theme-changing .top-bar,
@@ -568,28 +418,41 @@ html.theme-changing .btn-secondary {
                 box-shadow 0.4s ease !important;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   26. NÚT BẤM VỚI SHADOW MỀM MẠI
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 26. NÚT PRIMARY — bỏ glow màu, chỉ shadow đen ═══ */
 .btn-primary {
-    box-shadow: 0 4px 14px var(--primary-glow);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     transition: all 0.3s var(--ease-spring);
 }
-
 .btn-primary:hover:not(:disabled) {
-    box-shadow: 0 8px 24px var(--primary-glow), 0 0 0 4px rgba(99, 102, 241, 0.1);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.20);
+}
+[data-theme="dark"] .btn-primary {
+    box-shadow: 0 2px 8px rgba(255,255,255,0.10);
+}
+[data-theme="dark"] .btn-primary:hover:not(:disabled) {
+    box-shadow: 0 4px 16px rgba(255,255,255,0.15);
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   27. WORKLOG ROW HIGHLIGHT — Dòng mới thêm sáng lên
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 27. WORKLOG ROW HIGHLIGHT ═══ */
 .worklog-row-new {
     animation: rowHighlight 2s ease-out;
 }
-
 @keyframes rowHighlight {
     0% {
-        background: rgba(99, 102, 241, 0.3);
+        background: rgba(0, 0, 0, 0.10);
+        transform: scale(1.02);
+    }
+    100% {
+        background: transparent;
+        transform: scale(1);
+    }
+}
+[data-theme="dark"] .worklog-row-new {
+    animation: rowHighlightDark 2s ease-out;
+}
+@keyframes rowHighlightDark {
+    0% {
+        background: rgba(255, 255, 255, 0.08);
         transform: scale(1.02);
     }
     100% {
@@ -598,61 +461,69 @@ html.theme-changing .btn-secondary {
     }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   28. ICON SPIN — Xoay icon khi loading
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 28. ICON SPIN ═══ */
 .icon-spin {
     display: inline-block;
     animation: spin 1s linear infinite;
 }
-
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   29. DROPDOWN BOUNCE — Select mở ra có bounce
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 29. SELECT FOCUS ═══ */
 select.form-control:focus {
     animation: selectFocus 0.3s var(--ease-spring);
 }
-
 @keyframes selectFocus {
     0% { transform: scale(1); }
     50% { transform: scale(1.02); }
     100% { transform: scale(1); }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   30. GLASS EFFECT — Hiệu ứng kính mờ (cho card đặc biệt)
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ 30. GLASS ═══ */
 .glass {
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.3);
 }
-
 [data-theme="dark"] .glass {
-    background: rgba(17, 24, 39, 0.7);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(20, 20, 20, 0.7);
+    border-color: rgba(255, 255, 255, 0.08);
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   RESPECT REDUCED MOTION
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══ PROGRESS RING — pulse nhẹ khi update ═══ */
+.ring-container svg circle:last-child {
+    transition: stroke-dashoffset 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ═══ BOTTOM SHEET ANIMATION ═══ */
+.bottom-sheet.open .bottom-sheet-panel {
+    animation: sheetUp 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.bottom-sheet.open .bottom-sheet-backdrop {
+    animation: backdropIn 0.3s var(--ease-out);
+}
+@keyframes sheetUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+@keyframes backdropIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ═══ RESPECT REDUCED MOTION ═══ */
 @media (prefers-reduced-motion: reduce) {
-    .hero-card::after,
     .holiday-badge,
     .profile-item.active .profile-avatar,
     .chart-container svg rect,
     .fab::after,
     .pulse-ring::before,
     .pulse-ring::after,
-    .text-glow {
+    .heartbeat {
         animation: none !important;
     }
-
     .card.glow,
     .flip-in,
     .bounce-in,
