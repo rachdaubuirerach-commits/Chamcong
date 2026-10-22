@@ -1,4 +1,4 @@
-const CACHE = 'timetracker-v4.0.4';
+const CACHE = 'timetracker-v4.0.5';
 const ASSETS = [
   './', './index.html', './style.css', './style-effects.css', './app.js',
   './effects.js', './image-export.js', './ocr-compare.js',
