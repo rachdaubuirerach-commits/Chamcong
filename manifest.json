@@ -1,0 +1,20 @@
+{
+  "name": "TimeTracker - Chấm công & Lương",
+  "short_name": "TimeTracker",
+  "description": "Chấm công, tính lương, thống kê",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#005BAA",
+  "theme_color": "#005BAA",
+  "orientation": "portrait",
+  "lang": "vi",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%23005BAA'/%3E%3Ccircle cx='96' cy='92' r='44' stroke='%23FFC933' stroke-width='8' fill='none'/%3E%3Cpath d='M78 92l14 14 30-30' stroke='%23FFC933' stroke-width='8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
