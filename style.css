@@ -2296,3 +2296,90 @@ body.drawer-open .fab {
 #edit-name-avatar.bump {
   transform: scale(1.08);
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   iOS / Safari Specific Fixes (v4.0.6)
+   Fix layout lệch trên iPhone (input date/time, select, font)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 1. Reset mặc định của WebKit cho mọi form control */
+input,
+select,
+textarea,
+button {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  font-family: inherit;
+  border-radius: var(--r-md);
+}
+
+/* 2. FIX INPUT DATE VÀ TIME TRÊN iOS */
+input[type="date"],
+input[type="time"] {
+  min-height: 48px;
+  line-height: 48px; 
+  padding: 0 14px;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Ép text bên trong date/time căn trái và thẳng hàng */
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  text-align: left;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+/* Ẩn icon mặc định của iOS để không phá layout (nếu thấy cần thiết) */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 0.4;
+}
+
+/* 3. FIX KHỐI INPUT DATE + NÚT "HÔM NAY" */
+/* Đảm bảo flex container kéo giãn đều */
+#page-worklog .form-group > div {
+  display: flex !important;
+  gap: 8px;
+  align-items: stretch !important;
+}
+
+#page-worklog .form-group > div .btn {
+  min-height: 48px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+/* 4. FIX SELECT */
+select.form-control {
+  background-position: right 14px center;
+  padding-right: 40px;
+  min-height: 48px;
+  line-height: normal;
+  display: flex;
+  align-items: center;
+}
+
+/* 5. FIX FONT CHỮ (Đậm hơn, rõ hơn trên iOS) */
+.form-group label {
+  font-weight: 700;
+  color: var(--text-2);
+}
+.form-control {
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+/* 6. Fix lỗi card bị trong suốt / ám màu trên iOS */
+.card {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--surface);
+}
