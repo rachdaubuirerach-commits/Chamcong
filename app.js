@@ -1,9 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════
-   TimeTracker v4.0.4 — MB Bank Style + i18n hoàn chỉnh 100%
+   TimeTracker v4.0.5 — MB Bank Style + i18n hoàn chỉnh
+   Fix: Chart % height bug, html2canvas error handling
    ═══════════════════════════════════════════════════════════════ */
 'use strict';
 
-const APP_VERSION = "4.0.4";
+const APP_VERSION = "4.0.5";
 const SCHEMA_VERSION = 2;
 const DRAFT_KEY = 'tt_worklog_draft';
 const BALANCE_HIDDEN_KEY = 'tt_balance_hidden';
@@ -123,18 +124,9 @@ const I18N_EN = {
   'Không có dữ liệu tháng này': 'No data this month',
 
   // MONTHS
-  'Tháng 1': 'Jan',
-  'Tháng 2': 'Feb',
-  'Tháng 3': 'Mar',
-  'Tháng 4': 'Apr',
-  'Tháng 5': 'May',
-  'Tháng 6': 'Jun',
-  'Tháng 7': 'Jul',
-  'Tháng 8': 'Aug',
-  'Tháng 9': 'Sep',
-  'Tháng 10': 'Oct',
-  'Tháng 11': 'Nov',
-  'Tháng 12': 'Dec',
+  'Tháng 1': 'Jan', 'Tháng 2': 'Feb', 'Tháng 3': 'Mar', 'Tháng 4': 'Apr',
+  'Tháng 5': 'May', 'Tháng 6': 'Jun', 'Tháng 7': 'Jul', 'Tháng 8': 'Aug',
+  'Tháng 9': 'Sep', 'Tháng 10': 'Oct', 'Tháng 11': 'Nov', 'Tháng 12': 'Dec',
 
   // DRAWER
   'Cấu hình lương': 'Salary config',
@@ -294,13 +286,9 @@ function translateAll() {
 
     if (isEn) {
       let en = I18N_EN[trimmed];
-      // Xử lý regex fallback cho các trường hợp động
       if (!en) {
-        if (/^Tháng \d+$/.test(trimmed)) {
-          en = trimmed.replace('Tháng', 'Month');
-        } else if (/^Thứ \d+$/.test(trimmed)) {
-          en = trimmed.replace('Thứ', 'Day');
-        }
+        if (/^Tháng \d+$/.test(trimmed)) en = trimmed.replace('Tháng', 'Month');
+        else if (/^Thứ \d+$/.test(trimmed)) en = trimmed.replace('Thứ', 'Day');
       }
       if (en && en !== trimmed) {
         node.nodeValue = orig.replace(trimmed, en);
@@ -601,7 +589,6 @@ function toggleLanguage() {
   saveSettingsToStorage();
   applyLanguage();
   renderDrawerState();
-  // Re-render dynamic page content
   if (currentPage === 'home') renderHome();
   else if (currentPage === 'calendar') renderCalendar();
   else if (currentPage === 'worklog') { loadWorkLogTable(); previewWorkLog(); }
@@ -1282,7 +1269,7 @@ function renderChartSheet() {
     <div style="display:flex;align-items:flex-end;gap:3px;height:160px;padding:16px 8px;background:var(--surface-2);border-radius:16px;margin-bottom:12px;">
       ${data.map((v, i) => {
         const h = v > 0 ? Math.max(6, (v / max) * 100) : 3;
-        return `<div style="flex:1;height:${h}%;background:${v > 0 ? 'linear-gradient(180deg, #0073CC, #005BAA)' : 'var(--border)'};border-radius:4px 4px 0 0;" title="Day ${i + 1}: ${v.toFixed(1)}h"></div>`;
+        return `<div style="flex:1;height:${h}px;background:${v > 0 ? 'linear-gradient(180deg, #0073CC, #005BAA)' : 'var(--border)'};border-radius:4px 4px 0 0;" title="Day ${i + 1}: ${v.toFixed(1)}h"></div>`;
       }).join('')}
     </div>
     <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);font-weight:600;margin-bottom:16px;">
@@ -1790,7 +1777,7 @@ function loadWorkLogTable() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// STATS
+// STATS (Fixed Chart Height)
 // ═══════════════════════════════════════════════════════════════
 function loadStats() {
   const mSel = document.getElementById('stat-month-select');
@@ -1847,6 +1834,7 @@ function loadStats() {
     renderTrendChart();
   }, 50);
 }
+
 function renderDailyChart(logs, m, y) {
   const el = document.getElementById('chart-daily');
   if (!el) return;
@@ -1861,10 +1849,16 @@ function renderDailyChart(logs, m, y) {
     if (d >= 1 && d <= days) data[d - 1] = (l.regularHours || 0) + (l.overtimeHours || 0);
   });
   const max = Math.max(...data, 1);
+  
+  // Dùng px thay vì % để đảm bảo hiển thị đúng
   el.innerHTML = `<div style="display:flex;align-items:flex-end;gap:3px;height:140px;padding-top:20px;">
-    ${data.map((v, i) => `<div class="chart-bar" style="height:${v > 0 ? Math.max(8, (v / max) * 100) : 4}%;background:${v > 0 ? 'linear-gradient(180deg, #0073CC, #005BAA)' : 'var(--border)'};" title="${tr('Ngày','Day')} ${i + 1}: ${v.toFixed(1)}h"></div>`).join('')}
+    ${data.map((v, i) => {
+      const h = v > 0 ? Math.max(8, (v / max) * 100) : 4;
+      return `<div class="chart-bar" style="height:${h}px;background:${v > 0 ? 'linear-gradient(180deg, #0073CC, #005BAA)' : 'var(--border)'};" title="${tr('Ngày','Day')} ${i + 1}: ${v.toFixed(1)}h"></div>`;
+    }).join('')}
   </div>`;
 }
+
 function renderShiftChart(morning, night) {
   const el = document.getElementById('chart-shifts');
   if (!el) return;
@@ -1889,6 +1883,7 @@ function renderShiftChart(morning, night) {
     </div>
   </div>`;
 }
+
 function renderTrendChart() {
   const el = document.getElementById('chart-trend');
   if (!el) return;
@@ -1901,11 +1896,16 @@ function renderTrendChart() {
     pts.push({ label: `${m}/${String(y).slice(-2)}`, value: total });
   }
   const max = Math.max(...pts.map(p => p.value), 1);
+  
+  // Dùng px thay vì % để đảm bảo hiển thị đúng
   el.innerHTML = `<div style="display:flex;align-items:flex-end;gap:6px;height:140px;padding-top:20px;">
-    ${pts.map(p => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
-      <div class="chart-bar" style="width:100%;height:${p.value > 0 ? Math.max(8, (p.value / max) * 100) : 4}%;background:${p.value > 0 ? 'linear-gradient(180deg, #0073CC, #005BAA)' : 'var(--border)'};" title="${formatMoney(p.value)}"></div>
-      <span style="font-size:10px;color:var(--text-3);font-weight:600;">${p.label}</span>
-    </div>`).join('')}
+    ${pts.map(p => {
+      const h = p.value > 0 ? Math.max(8, (p.value / max) * 100) : 4;
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%;">
+        <div class="chart-bar" style="width:100%;height:${h}px;background:${p.value > 0 ? 'linear-gradient(180deg, #0073CC, #005BAA)' : 'var(--border)'};" title="${formatMoney(p.value)}"></div>
+        <span style="font-size:10px;color:var(--text-3);font-weight:600;margin-top:auto;">${p.label}</span>
+      </div>`;
+    }).join('')}
   </div>`;
 }
 
@@ -1928,7 +1928,10 @@ function buildExportRows() {
   return { rows, m, y };
 }
 async function exportImage() {
-  if (typeof ImageExporter === 'undefined') { toast(tr('Module xuất ảnh chưa tải','Export module not loaded'), 'warning'); return; }
+  if (typeof html2canvas === 'undefined' || typeof ImageExporter === 'undefined') {
+    toast(tr('Thư viện xuất ảnh chưa tải, vui lòng thử lại', 'Export library not loaded, please try again'), 'danger');
+    return;
+  }
   const { rows, m, y } = buildExportRows();
   if (rows.length === 0) { toast(tr('Không có dữ liệu tháng này','No data this month'), 'warning'); return; }
   const btn = document.getElementById('image-export-btn');
