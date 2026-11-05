@@ -1,1209 +1,519 @@
 /* ═══════════════════════════════════════════════════════════════
-   ocr-compare.js — Adaptive OCR Engine v6 (Phase 1.5)
-   - Fix cross-browser: Chrome, Safari iOS, Samsung Internet, Huawei
-   - willReadFrequently: true → force CPU backend cho canvas
-   - Detect browser yếu → preprocessing đơn giản hơn
-   - Mathematical Validation: tính TC dự kiến từ giờ vào/ra
-   - Candidate Generator + Auto-fix TC
+   ocr-compare.js v8.0 — VietSUN/HR Factory Parser & Preview
+   - Tự động inject CSS (độc lập hoàn toàn)
+   - Parser chuyên biệt cho bảng công có chữ Hán (缺卡, 免卡)
+   - Preview Editable (sửa/xóa trước khi so sánh)
+   - So sánh thông minh (tolerance 30p, detect shift)
    ═══════════════════════════════════════════════════════════════ */
 
 const OCRCompare = (function () {
     'use strict';
 
-    // ═══ NGƯỠNG SAI SỐ ═══
-    const TOLERANCE_START_MINUTES = 60;
-    const TOLERANCE_END_MINUTES = 15;
-    const TOLERANCE_HOURS = 0.25;
-    const TOLERANCE_OT_DAY = 0.25;
-    const TOLERANCE_OT_NIGHT = 0.5;
-
-    // ═══ GIỚI HẠN HỢP LỆ ═══
-    const VALID_YEAR_RANGE = 2;
-    const MAX_OT_HOURS = 8;
-    const MIN_REG_HOURS = 5;
-    const MAX_REG_HOURS = 12;
-
-    const VALID_START_MINUTES = [
-        [5 * 60, 9 * 60],
-        [17 * 60, 23 * 60]
-    ];
-
-    const VALID_END_MINUTES = [
-        [4 * 60, 9 * 60],
-        [17 * 60, 21 * 60]
-    ];
-
-    // ═══ GIỚI HẠN ẢNH ═══
-    const MAX_IMAGE_DIMENSION = 3000;
-    const MAX_IMAGE_PIXELS = 9000000;
-
-    // ═══ ADAPTIVE ENGINE v6 CONSTANTS ═══
-    const OCR_CHAR_MAP = {
-        'S': '3', 's': '3',
-        'O': '0', 'o': '0',
-        'I': '1', 'l': '1', '|': '1',
-        'Z': '2', 'z': '2',
-        'G': '6', 'b': '6',
-        'B': '8',
-        'T': '7',
-        'g': '9', 'q': '9'
+    // ═══ CẤU HÌNH ═══
+    const CONFIG = {
+        TOL_START_MIN: 60,      // Cho phép lệch giờ vào 60 phút (HR quẹt thẻ thực tế)
+        TOL_END_MIN: 30,        // Cho phép lệch giờ ra 30 phút
+        TOL_REG_HOURS: 0.25,    // Lệch giờ BT 15 phút
+        TOL_OT_HOURS: 0.25,     // Lệch giờ OT 15 phút
+        MAX_IMAGE_DIM: 2400,
     };
 
-    const COMMON_OT_VALUES = [
-        0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75,
-        3, 3.25, 3.5, 3.75, 4, 4.25, 4.5, 4.75, 5
-    ];
+    const BROWSER = {
+        isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent),
+        isSamsung: /SamsungBrowser/i.test(navigator.userAgent),
+        isWeak: /SamsungBrowser|iPad|iPhone|iPod/i.test(navigator.userAgent)
+    };
 
-    const OT_TOLERANCE = 0.5;
+    // ═══ STATE ═══
+    let state = {
+        worker: null,
+        parsedRows: [],     // Mảng chứa data sau khi parse (cho phép edit)
+        lastResults: null,  // Mảng chứa kết quả so sánh
+        isProcessing: false
+    };
 
-    // ═══ DETECT TRÌNH DUYỆT ═══
-    const BROWSER = (function() {
-        const ua = navigator.userAgent;
-        return {
-            isSafari: /^((?!chrome|android).)*safari/i.test(ua),
-            isIOS: /iPad|iPhone|iPod/.test(ua) && !window.MSStream,
-            isSamsung: /SamsungBrowser/i.test(ua),
-            isHuawei: /HuaweiBrowser/i.test(ua),
-            isChrome: /Chrome/i.test(ua) && !/Edge|OPR|SamsungBrowser/i.test(ua),
-            isFirefox: /Firefox/i.test(ua),
-            isEdge: /Edg/i.test(ua)
-        };
-    })();
-
-    // Trình duyệt "yếu" cần preprocessing đơn giản
-    const IS_WEAK_BROWSER = BROWSER.isSamsung || BROWSER.isIOS;
-
-    console.log('[OCR] Browser detect:', {
-        safari: BROWSER.isSafari,
-        ios: BROWSER.isIOS,
-        samsung: BROWSER.isSamsung,
-        huawei: BROWSER.isHuawei,
-        chrome: BROWSER.isChrome,
-        weak: IS_WEAK_BROWSER
-    });
-
-    let worker = null;
-    let lastResults = null;
-    let lastRawText = '';
-
-    // ═══════════════════════════════════════════════════════════
-    //  1. KHỞI TẠO TESSERACT WORKER
-    // ═══════════════════════════════════════════════════════════
-    async function initWorker() {
-        if (worker) return worker;
-
-        if (typeof Tesseract === 'undefined') {
-            throw new Error('Tesseract undefined. Kiểm tra file tesseract/tesseract.min.js');
-        }
-
-        console.log('[OCR] Khởi tạo worker (vie + chi_sim)...');
-        worker = await Tesseract.createWorker(['vie', 'chi_sim'], 1, {
-            workerPath: './tesseract/worker.min.js',
-            corePath: './tesseract/',
-            langPath: './tesseract/lang-data/',
-            logger: (m) => {
-                if (m.status === 'recognizing text') {
-                    updateProgress(50 + m.progress * 35, 'Đang đọc ảnh... ' + Math.round(m.progress * 100) + '%');
-                } else if (m.status === 'loading language traineddata') {
-                    updateProgress(15, 'Đang tải dữ liệu ngôn ngữ...');
-                } else if (m.status === 'initializing api') {
-                    updateProgress(30, 'Đang khởi tạo OCR...');
-                } else if (m.status === 'loading tesseract core') {
-                    updateProgress(5, 'Đang tải Tesseract core...');
-                }
-            }
-        });
-
-        await worker.setParameters({
-            tessedit_pageseg_mode: '6',
-            preserve_interword_spaces: '1'
-        });
-
-        console.log('[OCR] Worker sẵn sàng');
-        return worker;
+    // ═══ HELPERS ═══
+    const pad = n => String(n).padStart(2, '0');
+    
+    function timeToMin(t) {
+        if (!t || !/^\d{1,2}:\d{2}$/.test(t)) return null;
+        const [h, m] = t.split(':').map(Number);
+        return h * 60 + m;
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  2. XỬ LÝ FILE HEIC (iPhone)
-    // ═══════════════════════════════════════════════════════════
-    async function convertHeicIfNeeded(file) {
-        const isHeic = /\.(heic|heif)$/i.test(file.name) ||
-                       file.type === 'image/heic' ||
-                       file.type === 'image/heif';
-
-        if (!isHeic) return file;
-
-        if (typeof heic2any === 'undefined') {
-            console.warn('[OCR] heic2any chưa tải');
-            throw new Error('Ảnh HEIC cần thư viện heic2any. Chụp ảnh JPG hoặc tải lại trang.');
-        }
-
-        console.log('[OCR] Phát hiện ảnh HEIC, đang chuyển sang JPG...');
-        updateProgress(2, 'Đang chuyển ảnh HEIC...');
-
-        try {
-            const blob = await heic2any({
-                blob: file,
-                toType: 'image/jpeg',
-                quality: 0.92
-            });
-
-            const resultBlob = Array.isArray(blob) ? blob[0] : blob;
-            const newName = file.name.replace(/\.(heic|heif)$/i, '.jpg');
-
-            console.log('[OCR] Đã chuyển HEIC → JPG, size:', resultBlob.size);
-            return new File([resultBlob], newName, { type: 'image/jpeg' });
-        } catch (err) {
-            console.error('[OCR] Lỗi chuyển HEIC:', err);
-            throw new Error('Không chuyển được ảnh HEIC: ' + (err.message || err));
-        }
+    function calcDiffMin(t1, t2) {
+        const m1 = timeToMin(t1), m2 = timeToMin(t2);
+        if (m1 === null || m2 === null) return null;
+        let d = Math.abs(m1 - m2);
+        if (d > 12 * 60) d = 24 * 60 - d; // Xử lý ca đêm qua ngày
+        return d;
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  3. TIỀN XỬ LÝ ẢNH (cross-browser safe)
-    // ═══════════════════════════════════════════════════════════
-    function preprocessImage(file) {
+    // ═══ 1. INJECT CSS TỰ ĐỘNG ═══
+    function injectCSS() {
+        if (document.getElementById('ocr-custom-style')) return;
+        const style = document.createElement('style');
+        style.id = 'ocr-custom-style';
+        style.textContent = `
+            .ocr-preview-wrap { overflow-x: auto; margin-top: 10px; }
+            .ocr-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px; }
+            .ocr-table th { background: #F1F5F9; padding: 8px 4px; text-align: center; font-weight: 700; color: #475569; border-bottom: 2px solid #CBD5E1; }
+            .ocr-table td { padding: 6px 4px; text-align: center; border-bottom: 1px solid #E2E8F0; vertical-align: middle; }
+            .ocr-table tr.row-low { background: #FEF2F2; }
+            .ocr-table tr.row-warn { background: #FFFBEB; }
+            .ocr-inp { width: 100%; padding: 4px; border: 1px solid #CBD5E1; border-radius: 4px; font-family: monospace; font-size: 12px; text-align: center; box-sizing: border-box; }
+            .ocr-inp:focus { border-color: #005BAA; outline: none; }
+            .ocr-inp.num { width: 50px; }
+            .ocr-badge-miss { background: #FEE2E2; color: #991B1B; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+            .ocr-card { border-radius: 10px; padding: 12px; margin-bottom: 10px; border: 1px solid; }
+            .ocr-card-ok { background: #F0FDF4; border-color: #BBF7D0; }
+            .ocr-card-diff { background: #FEF2F2; border-color: #FECACA; }
+            .ocr-card-miss { background: #FFFBEB; border-color: #FDE68A; }
+            .ocr-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 800; }
+            .ocr-grid { display: grid; grid-template-columns: 50px 1fr 1fr; gap: 4px; font-size: 12px; }
+            .ocr-grid .lbl { color: #64748B; font-weight: 600; }
+            .ocr-cell.diff { color: #DC2626; font-weight: 800; text-decoration: line-through; }
+            .ocr-cell.match { color: #16A34A; font-weight: 700; }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // ═══ 2. TIỀN XỬ LÝ ẢNH & OCR ═══
+    async function preprocessImage(file) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
                 const canvas = document.createElement('canvas');
+                const scale = Math.max(img.width, img.height) > CONFIG.MAX_IMAGE_DIM 
+                    ? CONFIG.MAX_IMAGE_DIM / Math.max(img.width, img.height) : 1;
+                
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-                const maxDim = Math.max(img.width, img.height);
-                let scale = 1;
-
-                // ═══ SCALE THÔNG MINH (an toàn cho mọi browser) ═══
-                // Giảm scale nếu browser yếu để tránh lỗi pixel
-                if (IS_WEAK_BROWSER) {
-                    // Browser yếu: giảm scale để canvas nhẹ hơn
-                    if (maxDim < 800) scale = 1.5;
-                    else if (maxDim < 1500) scale = 1.2;
-                    else if (maxDim < 2500) scale = 1;
-                    else scale = 2000 / maxDim;
-                } else {
-                    // Browser mạnh: scale như cũ
-                    if (maxDim < 1000) scale = 2;
-                    else if (maxDim < 2000) scale = 1.5;
-                    else if (maxDim < 3000) scale = 1;
-                    else scale = MAX_IMAGE_DIMENSION / maxDim;
-                }
-
-                let finalW = Math.round(img.width * scale);
-                let finalH = Math.round(img.height * scale);
-                let totalPixels = finalW * finalH;
-
-                // Giới hạn pixel
-                const maxPixels = IS_WEAK_BROWSER ? 6000000 : MAX_IMAGE_PIXELS;
-                if (totalPixels > maxPixels) {
-                    const ratio = Math.sqrt(maxPixels / totalPixels);
-                    finalW = Math.round(finalW * ratio);
-                    finalH = Math.round(finalH * ratio);
-                    scale = finalW / img.width;
-                }
-
-                console.log('[OCR] Ảnh gốc:', img.width, 'x', img.height);
-                console.log('[OCR] Scale:', scale.toFixed(2), '(weak browser:', IS_WEAK_BROWSER + ')');
-                console.log('[OCR] Ảnh sau scale:', finalW, 'x', finalH, '(' + (finalW * finalH / 1000000).toFixed(1) + 'MP)');
-
-                canvas.width = finalW;
-                canvas.height = finalH;
-
-                // ═══ CRITICAL: willReadFrequently: true ═══
-                // Force CPU backend → pixel chính xác 100% trên mọi browser
-                const ctx = canvas.getContext('2d', {
-                    willReadFrequently: true,
-                    alpha: false
-                });
-
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(img, 0, 0, finalW, finalH);
-
-                // ═══ GRAYSCALE + CONTRAST ═══
-                // Trên browser yếu: dùng contrast thấp hơn để tránh artifact
+                // Tăng contrast nhẹ
                 try {
-                    const imageData = ctx.getImageData(0, 0, finalW, finalH);
-                    const data = imageData.data;
-
-                    const contrast = IS_WEAK_BROWSER ? 1.15 : 1.3;
-                    const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
-
-                    for (let i = 0; i < data.length; i += 4) {
-                        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                        const val = Math.max(0, Math.min(255, factor * (gray - 128) + 128));
-                        data[i] = data[i + 1] = data[i + 2] = val;
-                        data[i + 3] = 255; // Alpha luôn 255
+                    const d = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const p = d.data;
+                    for (let i = 0; i < p.length; i += 4) {
+                        const g = 0.299 * p[i] + 0.587 * p[i+1] + 0.114 * p[i+2];
+                        const v = Math.min(255, Math.max(0, 1.2 * (g - 128) + 128));
+                        p[i] = p[i+1] = p[i+2] = v;
                     }
-                    ctx.putImageData(imageData, 0, 0);
-                } catch (e) {
-                    console.warn('[OCR] Preprocess skip:', e);
-                }
+                    ctx.putImageData(d, 0, 0);
+                } catch (e) {}
 
-                // ═══ FORMAT OUTPUT ═══
-                // iOS: JPEG (nhẹ hơn), các browser khác: PNG (lossless)
-                const useJPEG = BROWSER.isIOS;
-                const format = useJPEG ? 'image/jpeg' : 'image/png';
-                const quality = useJPEG ? 0.92 : undefined;
-
-                canvas.toBlob((blob) => {
-                    if (blob) {
-                        console.log('[OCR] Blob sau xử lý:', blob.size, 'bytes, format:', format);
-                        resolve(blob);
-                    } else {
-                        reject(new Error('Không tạo được ảnh xử lý.'));
-                    }
-                }, format, quality);
+                canvas.toBlob(b => resolve(b), BROWSER.isIOS ? 'image/jpeg' : 'image/png', 0.92);
             };
-            img.onerror = () => reject(new Error('Không đọc được file ảnh.'));
+            img.onerror = () => reject(new Error('Không đọc được ảnh.'));
             img.src = URL.createObjectURL(file);
         });
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  4. PARSE TEXT OCR
-    // ═══════════════════════════════════════════════════════════
-    function parseOCRText(text) {
-        const lines = text.split('\n');
-        const dateRegex = /(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/;
+    async function initWorker() {
+        if (state.worker) return state.worker;
+        if (typeof Tesseract === 'undefined') throw new Error('Thư viện Tesseract chưa tải.');
+        
+        state.worker = await Tesseract.createWorker(['vie', 'chi_sim'], 1, {
+            workerPath: './tesseract/worker.min.js',
+            corePath: './tesseract/',
+            langPath: './tesseract/lang-data/',
+            logger: m => {
+                if (m.status === 'recognizing text') {
+                    updateProgress(50 + m.progress * 40, `Đang đọc... ${Math.round(m.progress*100)}%`);
+                } else if (m.status === 'loading language traineddata') {
+                    updateProgress(20, 'Đang tải ngôn ngữ...');
+                }
+            }
+        });
+        // PSM 6: Coi text như 1 block văn bản
+        await state.worker.setParameters({ tessedit_pageseg_mode: '6' });
+        return state.worker;
+    }
 
-        const records = [];
-        let currentRecord = '';
+    // ═══ 3. PARSER CHUYÊN BIỆT CHO VIETSUN ═══
+    function parseHRText(rawText) {
+        const lines = rawText.split('\n');
+        const rows = [];
+        const dateRegex = /\b(\d{4})-(\d{2})-(\d{2})\b/;
+        const timeRegex = /(\d{1,2}):(\d{2})/g;
 
-        for (const rawLine of lines) {
-            const line = rawLine.trim();
+        for (let line of lines) {
+            line = line.trim();
             if (!line) continue;
 
-            const hasDate = dateRegex.test(line);
-            const hasRowNumberAndId = /^\d{1,4}\s*[|I]?\s*(VN|vw|VW|vn)\d{4,}/i.test(line);
+            const dateMatch = line.match(dateRegex);
+            if (!dateMatch) continue; // Dòng không có ngày -> Bỏ qua
 
-            if (hasDate) {
-                if (currentRecord) records.push(currentRecord);
-                currentRecord = line;
-            } else if (hasRowNumberAndId && currentRecord) {
-                records.push(currentRecord);
-                currentRecord = line;
-            } else if (currentRecord) {
-                currentRecord += ' ' + line;
-            }
-        }
-        if (currentRecord) records.push(currentRecord);
-
-        console.log('[OCR] Gộp được', records.length, 'records');
-
-        const rows = [];
-
-        for (const record of records) {
-            const dateMatch = record.match(dateRegex);
-            if (!dateMatch) continue;
-
-            const y = dateMatch[1];
-            const mo = String(dateMatch[2]).padStart(2, '0');
-            const d = String(dateMatch[3]).padStart(2, '0');
-            const date = `${y}-${mo}-${d}`;
-
-            if (record.includes('缺卡') || record.includes('休息') || record.includes('免卡') || record.includes('节假日')) {
-                console.log('[OCR] Bỏ (miễn/nghỉ/lễ):', date);
+            const date = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
+            
+            // Bỏ qua ngày nghỉ có lương / miễn chấm công
+            if (line.includes('免卡') || line.includes('休息') || line.includes('节假')) {
                 continue;
             }
 
-            let fixedRecord = record;
-
-            fixedRecord = fixedRecord.replace(/(\d{2}):(\d{2})7(\d{2}):\s*(\d{2})/g, '$1:$2~$3:$4');
-            fixedRecord = fixedRecord.replace(/(\d{1,2})\s+:\s*(\d{2})/g, '$1:$2');
-            fixedRecord = fixedRecord.replace(/(\d{1,2}):\s+(\d{2})/g, '$1:$2');
-            fixedRecord = fixedRecord.replace(/(\b\d{1,2}):(\d{1,2})\b/g, (match, a, b) => {
-                const h = parseInt(a), m = parseInt(b);
-                if (h >= 0 && h <= 23 && m >= 0 && m <= 59) return match;
-                return a + '.' + b;
-            });
-            fixedRecord = fixedRecord.replace(/(\d)\.\s+(\d+)/g, '$1.$2');
-            fixedRecord = fixedRecord.replace(/(\d)\s+\.\s+(\d+)/g, '$1.$2');
-
-            const timeRegex = /(\d{1,2}):(\d{2})/g;
-            const allTimes = [];
-            let tm;
-            while ((tm = timeRegex.exec(fixedRecord)) !== null) {
-                allTimes.push(tm[0]);
+            // Tìm tất cả giờ
+            const times = [];
+            let m;
+            while ((m = timeRegex.exec(line)) !== null) {
+                times.push(`${pad(m[1])}:${m[2]}`);
             }
 
-            if (allTimes.length < 4) continue;
+            // Bảng VietSUN luôn có cột ca (VD: 19:30~04:00) ở đầu -> Bỏ 2 số đầu
+            let start = null, end = null;
+            let isMissing = line.includes('缺卡') || line.includes('缺');
 
-            const shiftStart = allTimes[0];
-            const shiftEnd = allTimes[1];
-            const timesForActual = allTimes.slice(2);
-
-            if (timesForActual.length < 2) continue;
-
-            const actualStart = normalizeTime(timesForActual[0]);
-            const actualEnd = normalizeTime(timesForActual[1]);
-
-            const lastTimeStr = timesForActual[1];
-            const idx = fixedRecord.lastIndexOf(lastTimeStr);
-            const tail = idx === -1 ? '' : fixedRecord.slice(idx + lastTimeStr.length);
-            const numsAfter = [...tail.matchAll(/(\d+(?:[.,]\d+)?)/g)]
-                .map(x => parseFloat(x[1].replace(',', '.')));
-
-            const meaningful = numsAfter.filter(n => n > 0);
-
-            let regularHours = 0;
-            let overtimeHours = 0;
-            if (meaningful.length >= 2) {
-                regularHours = meaningful[0];
-                overtimeHours = meaningful[1];
-            } else if (meaningful.length === 1) {
-                regularHours = meaningful[0];
+            if (times.length >= 4) {
+                start = times[2];
+                end = times[3];
+            } else if (times.length === 3) {
+                start = times[2]; // Chỉ có giờ vào
             }
 
-            rows.push({
-                date, shiftStart, shiftEnd,
-                start: actualStart, end: actualEnd,
-                regularHours, overtimeHours,
-                raw: record
-            });
+            // Tìm giờ BT và OT (nằm ở phần đuôi)
+            let regHours = 0, otHours = 0;
+            let cutIdx = line.lastIndexOf(end || times[times.length-1]);
+            if (cutIdx === -1) cutIdx = line.lastIndexOf(times[0]); // fallback
+
+            if (cutIdx !== -1) {
+                const tail = line.substring(cutIdx + 5);
+                const nums = tail.match(/\d+(?:\.\d+)?/g) || [];
+                // Mảng nums thường là: [8, 3.75, 0, 0, 0, 0, 0]
+                if (nums.length >= 2) {
+                    regHours = parseFloat(nums[0]) || 0;
+                    otHours = parseFloat(nums[1]) || 0;
+                }
+            }
+
+            // Chỉ lấy những dòng có data thực sự
+            if (start || end || regHours > 0 || isMissing) {
+                rows.push({
+                    date,
+                    start: start || '',
+                    end: end || '',
+                    regHours,
+                    otHours,
+                    isMissing,
+                    edited: false
+                });
+            }
         }
-
         return rows;
     }
 
-    function normalizeTime(t) {
-        if (!t) return t;
-        const parts = t.split(':');
-        return String(parseInt(parts[0], 10)).padStart(2, '0') + ':' + parts[1];
+    // ═══ 4. RENDER PREVIEW (CHO PHÉP SỬA) ═══
+    function renderPreview() {
+        const el = document.getElementById('ocr-result');
+        if (!el) return;
+        injectCSS();
+
+        let html = `
+            <div style="background:#E0F2FE;border:1.5px solid #0284C7;border-radius:12px;padding:12px;margin-bottom:12px;">
+                <div style="font-weight:800;color:#075985;margin-bottom:4px;">📋 Xem trước ${state.parsedRows.length} dòng</div>
+                <div style="font-size:12px;color:#0C4A6E;">Kiểm tra và sửa nếu cần, sau đó bấm <strong>So sánh</strong>.</div>
+            </div>
+            <div class="ocr-preview-wrap">
+                <table class="ocr-table">
+                    <thead>
+                        <tr>
+                            <th>Ngày</th>
+                            <th>Giờ Vào</th>
+                            <th>Giờ Ra</th>
+                            <th>Giờ BT</th>
+                            <th>OT</th>
+                            <th>Xóa</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+        state.parsedRows.forEach((r, i) => {
+            const rowCls = r.isMissing ? 'row-low' : (r.regHours === 0 ? 'row-warn' : '');
+            html += `
+                <tr class="${rowCls}">
+                    <td style="font-weight:700;color:#1E293B;">${r.date}</td>
+                    <td><input type="time" class="ocr-inp" value="${r.start}" data-idx="${i}" data-field="start" ${r.isMissing ? 'placeholder="缺卡"' : ''}></td>
+                    <td><input type="time" class="ocr-inp" value="${r.end}" data-idx="${i}" data-field="end" ${r.isMissing ? 'placeholder="缺卡"' : ''}></td>
+                    <td><input type="number" step="0.25" class="ocr-inp num" value="${r.regHours}" data-idx="${i}" data-field="regHours"></td>
+                    <td><input type="number" step="0.25" class="ocr-inp num" value="${r.otHours}" data-idx="${i}" data-field="otHours"></td>
+                    <td><button class="log-del" onclick="OCRCompare.removeRow(${i})">×</button></td>
+                </tr>`;
+        });
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:16px;">
+                <button class="btn btn-primary" style="flex:1;" onclick="OCRCompare.confirmCompare()">
+                    <svg width="16" height="16"><use href="#i-check"/></svg> So sánh
+                </button>
+                <button class="btn" style="flex:1;background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);" onclick="OCRCompare.clear()">
+                    Hủy
+                </button>
+            </div>`;
+
+        el.innerHTML = html;
+        el.style.display = 'block';
+        document.getElementById('ocr-actions').style.display = 'none';
+
+        // Bind events
+        el.querySelectorAll('input').forEach(inp => {
+            inp.addEventListener('change', (e) => {
+                const idx = parseInt(e.target.dataset.idx);
+                const field = e.target.dataset.field;
+                let val = e.target.value;
+                if (field === 'regHours' || field === 'otHours') {
+                    state.parsedRows[idx][field] = parseFloat(val) || 0;
+                } else {
+                    state.parsedRows[idx][field] = val;
+                }
+                state.parsedRows[idx].edited = true;
+                state.parsedRows[idx].isMissing = false; // Đã sửa thì bỏ cờ missing
+            });
+        });
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  5. HELPERS
-    // ═══════════════════════════════════════════════════════════
-    function timeToMinutes(t) {
-        if (!t) return null;
-        const [h, m] = t.split(':').map(Number);
-        if (isNaN(h) || isNaN(m)) return null;
-        return h * 60 + m;
-    }
-
-    function timeDiffMinutes(t1, t2) {
-        const m1 = timeToMinutes(t1);
-        const m2 = timeToMinutes(t2);
-        if (m1 === null || m2 === null) return null;
-        let diff = Math.abs(m1 - m2);
-        if (diff > 12 * 60) diff = Math.min(diff, 24 * 60 - diff);
-        return diff;
-    }
-
-    function numDiff(a, b) {
-        if (a === null || b === null) return null;
-        return Math.abs(a - b);
-    }
-
-    function isNightShift(startTime) {
-        if (!startTime) return false;
-        const m = timeToMinutes(startTime);
-        if (m === null) return false;
-        return m >= 17 * 60 || m < 9 * 60;
-    }
-
-    function isTimeInRanges(minutes, ranges) {
-        for (const [min, max] of ranges) {
-            if (minutes >= min && minutes <= max) return true;
-        }
-        return false;
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  6. ADAPTIVE OCR ENGINE — Helper Functions
-    // ═══════════════════════════════════════════════════════════
-
-    function calculateExpectedOT(gioVao, gioRa, loaiCa) {
-        const startMin = timeToMinutes(gioVao);
-        const endMin = timeToMinutes(gioRa);
-        if (startMin === null || endMin === null) return null;
-
-        const tcStart = loaiCa === 'Đêm' ? (4 * 60 + 30) : (16 * 60 + 30);
-
-        let realEnd = endMin;
-        if (loaiCa === 'Đêm' && endMin < 12 * 60) {
-            realEnd = endMin + 24 * 60;
-        }
-
-        if (realEnd <= tcStart) return 0;
-
-        let ot = (realEnd - tcStart) / 60;
-
-        if (ot >= 3) ot += 0.5;
-        if (loaiCa === 'Đêm' && ot > 0) ot += 0.25;
-
-        return Math.round(ot * 100) / 100;
-    }
-
-    function generateCandidates(rawText) {
-        if (!rawText) return [];
-
-        const candidates = new Set();
-        const raw = String(rawText).trim();
-
-        const rawNum = parseFloat(raw.replace(',', '.'));
-        if (!isNaN(rawNum) && rawNum >= 0) candidates.add(rawNum);
-
-        let mapped = raw;
-        for (const [from, to] of Object.entries(OCR_CHAR_MAP)) {
-            mapped = mapped.split(from).join(to);
-        }
-        const mappedNum = parseFloat(mapped.replace(',', '.'));
-        if (!isNaN(mappedNum) && mappedNum >= 0) candidates.add(mappedNum);
-
-        const digitsOnly = raw.replace(/[^0-9.]/g, '');
-        const digitsNum = parseFloat(digitsOnly);
-        if (!isNaN(digitsNum) && digitsNum >= 0) candidates.add(digitsNum);
-
-        const digits = raw.replace(/[^0-9]/g, '');
-        if (digits.length === 3) {
-            candidates.add(parseFloat(digits[0] + '.' + digits.slice(1)));
-            candidates.add(parseFloat(digits.slice(0, 2) + '.' + digits.slice(2)));
-        }
-
-        if (!isNaN(rawNum) && rawNum > 0) {
-            if (rawNum > 20) candidates.add(Math.round(rawNum / 10 * 100) / 100);
-            if (rawNum < 0.5 && rawNum > 0) candidates.add(Math.round(rawNum * 10 * 100) / 100);
-        }
-
-        return [...candidates].filter(c => c >= 0 && c <= 12);
-    }
-
-    function pickBestCandidate(candidates, expected) {
-        if (candidates.length === 0) return null;
-
-        if (expected === null || expected === undefined) {
-            let best = candidates[0];
-            let bestScore = -Infinity;
-            for (const c of candidates) {
-                let score = 0;
-                if (COMMON_OT_VALUES.includes(c)) score += 10;
-                if (c === 0 || c === 3.75) score += 5;
-                if (score > bestScore) { bestScore = score; best = c; }
-            }
-            return best;
-        }
-
-        let best = candidates[0];
-        let bestDiff = Math.abs(candidates[0] - expected);
-        for (const c of candidates) {
-            const diff = Math.abs(c - expected);
-            if (diff < bestDiff) { bestDiff = diff; best = c; }
-        }
-        return best;
-    }
-
-    function validateAndFixOT(record) {
-        const result = {
-            fixed: false,
-            reason: null,
-            original: record.overtimeHours,
-            newValue: record.overtimeHours,
-            confidence: 'high',
-            expected: null,
-            candidates: []
-        };
-
-        if (record.shift !== 'Đêm') return result;
-        if (!record.overtimeHours || record.overtimeHours <= 0) return result;
-
-        const expected = calculateExpectedOT(record.start, record.end, record.shift);
-        if (expected === null) return result;
-
-        result.expected = expected;
-
-        const diff = Math.abs(record.overtimeHours - expected);
-        if (diff <= OT_TOLERANCE) return result;
-
-        console.log(`[OCR] TC sai cho ${record.date}: ${record.overtimeHours} vs expected ${expected} (lệch ${diff.toFixed(2)}h)`);
-
-        const candidates = generateCandidates(String(record.overtimeHours));
-        result.candidates = candidates;
-
-        if (candidates.length === 0) {
-            result.confidence = 'low';
-            result.reason = 'Không sinh được candidate';
-            return result;
-        }
-
-        const best = pickBestCandidate(candidates, expected);
-        const bestDiff = Math.abs(best - expected);
-
-        if (bestDiff <= OT_TOLERANCE) {
-            result.fixed = true;
-            result.newValue = best;
-            result.confidence = 'high';
-            result.reason = `Tự sửa từ ${record.overtimeHours} → ${best}`;
-            console.log(`[OCR] ✅ Tự sửa TC: ${record.overtimeHours} → ${best}`);
-        } else if (bestDiff <= OT_TOLERANCE * 2) {
-            result.fixed = true;
-            result.newValue = best;
-            result.confidence = 'medium';
-            result.reason = `Sửa nhưng chưa chắc: ${record.overtimeHours} → ${best}`;
-        } else {
-            result.confidence = 'low';
-            result.reason = `TC lệch ${diff.toFixed(2)}h, không fix được`;
-        }
-
-        return result;
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  7. CLEAN HR ROWS
-    // ═══════════════════════════════════════════════════════════
-    function cleanHrRows(rows) {
-        const currentYear = new Date().getFullYear();
-        const filtered = [];
-
-        for (const r of rows) {
-            const y = parseInt(r.date.substring(0, 4));
-            if (Math.abs(y - currentYear) > VALID_YEAR_RANGE) {
-                r.date = String(currentYear) + r.date.substring(4);
-            }
-
-            const bt = r.regularHours || 0;
-            const ot = r.overtimeHours || 0;
-
-            if (ot > MAX_OT_HOURS) continue;
-            if (bt !== 0 && (bt < MIN_REG_HOURS || bt > MAX_REG_HOURS)) continue;
-
-            const startMin = timeToMinutes(r.start);
-            if (startMin === null) continue;
-            if (!isTimeInRanges(startMin, VALID_START_MINUTES)) continue;
-
-            const endMin = timeToMinutes(r.end);
-            if (endMin === null) continue;
-            if (!isTimeInRanges(endMin, VALID_END_MINUTES)) continue;
-
-            const isNight = isNightShift(r.start);
-            if (isNight) {
-                if (startMin < endMin && (endMin - startMin) < 8 * 60) continue;
-            } else {
-                if (startMin > endMin) continue;
-            }
-
-            filtered.push(r);
-        }
-
-        const byDate = {};
-        for (const r of filtered) {
-            if (!byDate[r.date]) {
-                byDate[r.date] = r;
-            } else {
-                byDate[r.date] = pickBetterRow(byDate[r.date], r);
-            }
-        }
-
-        return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
-    }
-
-    function pickBetterRow(row1, row2) {
-        const score = (r) => {
-            let s = 0;
-            if (Math.abs((r.regularHours || 0) - 8) < 0.5) s += 10;
-            if (r.overtimeHours > 0 && r.overtimeHours < 6) s += 5;
-            if (r.start && isTimeInRanges(timeToMinutes(r.start), VALID_START_MINUTES)) s += 3;
-            if (r.end && isTimeInRanges(timeToMinutes(r.end), VALID_END_MINUTES)) s += 3;
-            return s;
-        };
-        return score(row1) >= score(row2) ? row1 : row2;
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  8. SO SÁNH
-    // ═══════════════════════════════════════════════════════════
-    function compareWithApp(hrRows, workLogs) {
-        const cleanedRows = cleanHrRows(hrRows);
-
-        console.log('[OCR] === Adaptive Validation ===');
-        const fixStats = { total: 0, fixed: 0, uncertain: 0, failed: 0 };
-
-        for (const hr of cleanedRows) {
-            const v = validateAndFixOT(hr);
-            fixStats.total++;
-
-            if (v.fixed) {
-                hr.overtimeHours = v.newValue;
-                hr.autoFixed = true;
-                hr.originalOT = v.original;
-                hr.fixConfidence = v.confidence;
-                if (v.confidence === 'high') fixStats.fixed++;
-                else fixStats.uncertain++;
-            } else if (v.confidence === 'low' && v.reason) {
-                hr.needsReview = true;
-                hr.suggestedOT = v.expected;
-                fixStats.failed++;
-            }
-        }
-
-        console.log(`[OCR] Stats: ${fixStats.fixed} sửa chắc, ${fixStats.uncertain} không chắc, ${fixStats.failed} không sửa được, tổng ${fixStats.total}`);
-
+    // ═══ 5. SO SÁNH VỚI APP ═══
+    function confirmCompare() {
+        if (!state.parsedRows.length) return;
+        
         const results = [];
-        for (const hr of cleanedRows) {
-            const appLog = workLogs.find(l => l.date === hr.date);
+        // Lấy workLogs từ app.js (biến global)
+        const appLogs = window.workLogs || [];
+
+        state.parsedRows.forEach(hr => {
+            const appLog = appLogs.find(l => l.date === hr.date);
             const hrIsSunday = new Date(hr.date + 'T00:00:00').getDay() === 0;
 
             if (!appLog) {
-                results.push({
-                    date: hr.date, hr, hrIsSunday, appLog: null,
-                    status: 'missing', message: 'App chưa chấm công'
-                });
-                continue;
+                results.push({ date: hr.date, hr, appLog: null, hrIsSunday, status: 'missing', diffs: ['App chưa chấm công'], fields: {} });
+                return;
             }
 
             const diffs = [];
             const fields = {};
-            const isNight = isNightShift(hr.start || appLog.start);
 
-            const startDiff = timeDiffMinutes(appLog.start, hr.start);
-            if (startDiff === null || startDiff <= TOLERANCE_START_MINUTES) fields.start = true;
-            else { fields.start = false; diffs.push(`Vào lệch ${startDiff}p`); }
+            // So sánh Giờ Vào
+            if (hr.start) {
+                const d = calcDiffMin(appLog.start, hr.start);
+                fields.start = d !== null && d <= CONFIG.TOL_START_MIN;
+                if (!fields.start) diffs.push(`Vào lệch ${d}p`);
+            } else {
+                fields.start = false;
+                diffs.push('HR thiếu giờ vào (缺卡)');
+            }
 
-            const endDiff = timeDiffMinutes(appLog.end, hr.end);
-            if (endDiff === null || endDiff <= TOLERANCE_END_MINUTES) fields.end = true;
-            else { fields.end = false; diffs.push(`Ra lệch ${endDiff}p`); }
+            // So sánh Giờ Ra
+            if (hr.end) {
+                const d = calcDiffMin(appLog.end, hr.end);
+                fields.end = d !== null && d <= CONFIG.TOL_END_MIN;
+                if (!fields.end) diffs.push(`Ra lệch ${d}p`);
+            } else {
+                fields.end = false;
+                diffs.push('HR thiếu giờ ra (缺卡)');
+            }
 
-            const regDiff = numDiff(appLog.regularHours || 0, hr.regularHours || 0);
-            if (regDiff === null || regDiff <= TOLERANCE_HOURS) fields.reg = true;
-            else { fields.reg = false; diffs.push(`BT lệch ${regDiff.toFixed(2)}h`); }
+            // So sánh BT & OT
+            const rd = Math.abs((appLog.regularHours || 0) - hr.regHours);
+            fields.reg = rd <= CONFIG.TOL_REG_HOURS;
+            if (!fields.reg) diffs.push(`BT lệch ${rd.toFixed(2)}h`);
 
-            const otTolerance = isNight ? TOLERANCE_OT_NIGHT : TOLERANCE_OT_DAY;
-            const otDiff = numDiff(appLog.overtimeHours || 0, hr.overtimeHours || 0);
-            if (otDiff === null || otDiff <= otTolerance) fields.ot = true;
-            else { fields.ot = false; diffs.push(`TC lệch ${otDiff.toFixed(2)}h`); }
+            const od = Math.abs((appLog.overtimeHours || 0) - hr.otHours);
+            fields.ot = od <= CONFIG.TOL_OT_HOURS;
+            if (!fields.ot) diffs.push(`OT lệch ${od.toFixed(2)}h`);
 
-            if (!!appLog.isSunday === hrIsSunday) fields.type = true;
-            else { fields.type = false; diffs.push('Loại ngày khác'); }
+            // Kiểm tra loại ngày
+            fields.type = !!appLog.isSunday === hrIsSunday;
+            if (!fields.type) diffs.push('Loại ngày khác (CN/Thường)');
 
             results.push({
-                date: hr.date, hr, hrIsSunday, appLog, isNight, fields,
+                date: hr.date, hr, appLog, hrIsSunday,
                 status: diffs.length === 0 ? 'ok' : 'diff',
-                diffs,
-                message: diffs.length === 0 ? 'Khớp' : 'Lệch: ' + diffs.join(', ')
+                diffs, fields
             });
-        }
-        results.sort((a, b) => a.date.localeCompare(b.date));
-        return results;
+        });
+
+        state.lastResults = results.sort((a, b) => a.date.localeCompare(b.date));
+        renderResults();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  9. HIỂN THỊ KẾT QUẢ
-    // ═══════════════════════════════════════════════════════════
-    function renderResults(results, rawText) {
+    // ═══ 6. RENDER KẾT QUẢ ═══
+    function renderResults() {
         const el = document.getElementById('ocr-result');
-        const ok = results.filter(r => r.status === 'ok').length;
-        const diff = results.filter(r => r.status === 'diff').length;
-        const missing = results.filter(r => r.status === 'missing').length;
-        const autoFixedCount = results.filter(r => r.hr && r.hr.autoFixed).length;
-
-        // Cảnh báo trình duyệt yếu
-        let browserWarning = '';
-        if (IS_WEAK_BROWSER) {
-            const browserName = BROWSER.isSamsung ? 'Samsung Internet' : (BROWSER.isIOS ? 'Safari iOS' : 'Trình duyệt này');
-            browserWarning = `
-                <div style="background:#FEF3C7;border:1.5px solid #F59E0B;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#92400E;">
-                    ⚠️ <strong>${browserName}</strong> có thể đọc kém chính xác hơn. Nếu kết quả sai nhiều, hãy dùng <strong>Chrome</strong> hoặc trình duyệt khác.
-                </div>`;
-        }
-
-        let html = browserWarning + `
-            <div class="ocr-summary">
-                <span class="ocr-badge ok">✅ Khớp: ${ok}</span>
-                <span class="ocr-badge diff">❌ Lệch: ${diff}</span>
-                <span class="ocr-badge missing">⚠️ Thiếu: ${missing}</span>
-                ${autoFixedCount > 0 ? `<span class="ocr-badge autofix">🔧 Tự sửa: ${autoFixedCount}</span>` : ''}
-            </div>
-            <p class="ocr-note">
-                💡 Ngưỡng: Vào ≤ <strong>${TOLERANCE_START_MINUTES}p (1h)</strong> ·
-                Ra ≤ <strong>${TOLERANCE_END_MINUTES}p</strong> ·
-                BT ≤ <strong>${TOLERANCE_HOURS}h</strong> ·
-                TC ca ngày ≤ <strong>${TOLERANCE_OT_DAY}h</strong> ·
-                TC ca đêm ≤ <strong>${TOLERANCE_OT_NIGHT}h</strong>
-            </p>
-
-            <details style="margin-bottom:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:8px;">
-                <summary style="cursor:pointer;font-weight:700;color:#475569;font-size:13px;">
-                    🔍 Xem text thô OCR đọc được (${rawText ? rawText.length : 0} ký tự)
-                </summary>
-                <textarea readonly style="width:100%;height:200px;font-family:monospace;font-size:10px;padding:8px;margin-top:8px;border:1px solid #CBD5E1;border-radius:6px;background:#FFF;color:#000;box-sizing:border-box;">${(rawText || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
-            </details>
-
-            <div class="ocr-cards">`;
-
-        for (const r of results) {
-            const isOk = r.status === 'ok';
-            const isDiff = r.status === 'diff';
-            const isMissing = r.status === 'missing';
-            const cardClass = isOk ? 'ocr-card-ok' : isDiff ? 'ocr-card-diff' : 'ocr-card-missing';
-            const icon = isOk ? '✅' : isDiff ? '❌' : '⚠️';
-            const statusText = isOk ? 'Khớp' : isDiff ? 'Lệch' : 'Chưa chấm';
-
-            const appVals = r.appLog ? {
-                start: r.appLog.start,
-                end: r.appLog.end,
-                reg: (r.appLog.regularHours || 0).toFixed(2),
-                ot: (r.appLog.overtimeHours || 0).toFixed(2)
-            } : { start: '—', end: '—', reg: '—', ot: '—' };
-
-            const hrVals = {
-                start: r.hr.start || '—',
-                end: r.hr.end || '—',
-                reg: r.hr.regularHours != null ? String(r.hr.regularHours) : '—',
-                ot: r.hr.overtimeHours != null ? String(r.hr.overtimeHours) : '—'
-            };
-
-            const f = r.fields || {};
-            const cls = {
-                start: (!isMissing && f.start === false) ? 'diff' : '',
-                end: (!isMissing && f.end === false) ? 'diff' : '',
-                reg: (!isMissing && f.reg === false) ? 'diff' : '',
-                ot: (!isMissing && f.ot === false) ? 'diff' : '',
-                type: (!isMissing && f.type === false) ? 'diff' : ''
-            };
-
-            let startNote = '', endNote = '';
-            if (r.appLog && r.hr.start && r.appLog.start !== r.hr.start) {
-                const d = timeDiffMinutes(r.appLog.start, r.hr.start);
-                if (d !== null && d > 0) startNote = `<small>±${d}p</small>`;
-            }
-            if (r.appLog && r.hr.end && r.appLog.end !== r.hr.end) {
-                const d = timeDiffMinutes(r.appLog.end, r.hr.end);
-                if (d !== null && d > 0) endNote = `<small>±${d}p</small>`;
-            }
-
-            const shiftBadge = r.isNight
-                ? `<span class="ocr-shift-badge night">🌙 Đêm</span>`
-                : `<span class="ocr-shift-badge day">☀️ Ngày</span>`;
-
-            let autoFixBadge = '';
-            if (r.hr.autoFixed) {
-                const orig = r.hr.originalOT;
-                const newVal = r.hr.overtimeHours;
-                const conf = r.hr.fixConfidence;
-                const icon2 = conf === 'high' ? '🔧' : '⚠️';
-                autoFixBadge = `<span class="ocr-autofix-badge ${conf}" title="Tự sửa TC từ ${orig} → ${newVal}">${icon2} TC: ${orig}→${newVal}</span>`;
-            }
-            if (r.hr.needsReview) {
-                autoFixBadge += `<span class="ocr-review-badge" title="Cần kiểm tra TC, dự kiến ${r.hr.suggestedOT}">👁️ Review (dự kiến ${r.hr.suggestedOT}h)</span>`;
-            }
-
-            html += `
-                <div class="ocr-card ${cardClass}">
-                    <div class="ocr-card-head">
-                        <span class="ocr-card-date">${r.date}</span>
-                        ${shiftBadge}
-                        <span class="ocr-card-type ${cls.type ? 'diff' : ''}">${r.hrIsSunday ? 'CN' : 'T'}</span>
-                        <span class="ocr-card-status">${icon} ${statusText}</span>
-                    </div>
-                    ${autoFixBadge ? `<div class="ocr-autofix-row">${autoFixBadge}</div>` : ''}
-                    <div class="ocr-card-body">
-                        <div class="ocr-row-head">
-                            <span></span>
-                            <span>App</span>
-                            <span>HR</span>
-                        </div>
-                        <div class="ocr-row">
-                            <span class="ocr-row-label">Vào</span>
-                            <span class="ocr-cell ${cls.start}">${appVals.start}</span>
-                            <span class="ocr-cell ${cls.start}">${hrVals.start} ${startNote}</span>
-                        </div>
-                        <div class="ocr-row">
-                            <span class="ocr-row-label">Ra</span>
-                            <span class="ocr-cell ${cls.end}">${appVals.end}</span>
-                            <span class="ocr-cell ${cls.end}">${hrVals.end} ${endNote}</span>
-                        </div>
-                        <div class="ocr-row">
-                            <span class="ocr-row-label">Giờ BT</span>
-                            <span class="ocr-cell ${cls.reg}">${appVals.reg}</span>
-                            <span class="ocr-cell ${cls.reg}">${hrVals.reg}</span>
-                        </div>
-                        <div class="ocr-row">
-                            <span class="ocr-row-label">Tăng ca</span>
-                            <span class="ocr-cell ${cls.ot}">${appVals.ot}</span>
-                            <span class="ocr-cell ${cls.ot}">${hrVals.ot}</span>
-                        </div>
-                    </div>
-                </div>`;
-        }
-        html += `</div>`;
-        el.innerHTML = html;
-        el.style.display = 'block';
-
-        const actions = document.getElementById('ocr-actions');
-        if (actions) actions.style.display = 'flex';
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  10. HIỂN THỊ TEXT THÔ
-    // ═══════════════════════════════════════════════════════════
-    function renderRawText(text, hrRowsCount) {
-        const el = document.getElementById('ocr-result');
-        const escaped = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        el.innerHTML = `
-            <div style="background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:14px;">
-                <div style="font-weight:800;color:#92400E;margin-bottom:8px;">⚠️ Không parse được dòng nào</div>
-                <div style="font-size:12px;color:#78350F;margin-bottom:8px;">
-                    Tesseract đọc được <strong>${text ? text.length : 0}</strong> ký tự.
-                    Parse được <strong>${hrRowsCount}</strong> dòng.
-                </div>
-                <textarea readonly style="width:100%;height:220px;font-family:monospace;font-size:11px;padding:8px;border:1px solid #F59E0B;border-radius:6px;background:#FFFBEB;color:#000;box-sizing:border-box;">${escaped}</textarea>
-            </div>`;
-        el.style.display = 'block';
-
-        const actions = document.getElementById('ocr-actions');
-        if (actions) actions.style.display = 'flex';
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  11. XUẤT ẢNH PNG
-    // ═══════════════════════════════════════════════════════════
-    async function exportImage() {
-        if (!lastResults || lastResults.length === 0) {
-            if (typeof showToast === 'function') showToast('⚠️ Chưa có kết quả để xuất', 'warning');
-            return;
-        }
-
-        const btn = document.getElementById('ocr-export-btn');
-        const originalHTML = btn ? btn.innerHTML : '';
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '⏳ Đang xuất...';
-        }
-
-        try {
-            if (typeof html2canvas === 'undefined') {
-                throw new Error('html2canvas chưa tải');
-            }
-
-            const html = buildExportHTML(lastResults);
-
-            const container = document.createElement('div');
-            container.style.position = 'fixed';
-            container.style.left = '-9999px';
-            container.style.top = '0';
-            container.style.background = '#FFFFFF';
-            container.innerHTML = html;
-            document.body.appendChild(container);
-
-            const canvas = await html2canvas(container.firstElementChild, {
-                scale: 2,
-                backgroundColor: '#FFFFFF',
-                useCORS: true,
-                logging: false
-            });
-
-            document.body.removeChild(container);
-
-            const now = new Date();
-            const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-            const filename = `doi_chieu_cong_${ts}.png`;
-
-            canvas.toBlob((blob) => {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-
-                if (typeof showToast === 'function') showToast(`✅ Đã xuất ${filename}`, 'success');
-                if (typeof haptic === 'function') haptic();
-                if (typeof playSound === 'function') playSound();
-            }, 'image/png');
-
-        } catch (err) {
-            console.error('[OCR] Export error:', err);
-            if (typeof showToast === 'function') showToast('❌ Lỗi xuất ảnh: ' + (err.message || err), 'danger');
-        } finally {
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = originalHTML;
-            }
-        }
-    }
-
-    function buildExportHTML(results) {
-        const ok = results.filter(r => r.status === 'ok').length;
-        const diff = results.filter(r => r.status === 'diff').length;
-        const missing = results.filter(r => r.status === 'missing').length;
-        const autoFixed = results.filter(r => r.hr && r.hr.autoFixed).length;
-
-        const now = new Date();
-        const dateStr = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
-        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-
-        let monthLabel = '';
-        if (results.length > 0) {
-            const [y, m] = results[0].date.split('-');
-            monthLabel = `Tháng ${m}/${y}`;
-        }
+        const res = state.lastResults;
+        const ok = res.filter(r => r.status === 'ok').length;
+        const diff = res.filter(r => r.status === 'diff').length;
+        const miss = res.filter(r => r.status === 'missing').length;
 
         let html = `
-        <div style="font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background:#FFFFFF; padding:24px; width:720px; box-sizing:border-box; color:#1E293B;">
-            <div style="border-bottom:3px solid #4F46E5; padding-bottom:14px; margin-bottom:14px;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                        <div style="font-size:20px; font-weight:800; color:#4F46E5;">📊 ĐỐI CHIẾU CÔNG HR</div>
-                        <div style="font-size:13px; color:#64748B; margin-top:3px;">${monthLabel}${autoFixed > 0 ? ' · 🔧 Tự sửa: ' + autoFixed : ''}</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="font-size:12px; color:#94A3B8;">Ngày xuất</div>
-                        <div style="font-size:14px; font-weight:700; color:#475569;">${dateStr} ${timeStr}</div>
-                    </div>
+            <div style="display:flex;gap:8px;margin-bottom:16px;">
+                <div style="flex:1;background:#D1FAE5;border-left:4px solid #10B981;padding:10px;border-radius:8px;">
+                    <div style="font-size:11px;color:#065F46;font-weight:700;">KHỚP</div>
+                    <div style="font-size:20px;font-weight:800;color:#059669;">${ok}</div>
+                </div>
+                <div style="flex:1;background:#FEE2E2;border-left:4px solid #EF4444;padding:10px;border-radius:8px;">
+                    <div style="font-size:11px;color:#991B1B;font-weight:700;">LỆCH</div>
+                    <div style="font-size:20px;font-weight:800;color:#DC2626;">${diff}</div>
+                </div>
+                <div style="flex:1;background:#FEF3C7;border-left:4px solid #F59E0B;padding:10px;border-radius:8px;">
+                    <div style="font-size:11px;color:#92400E;font-weight:700;">THIẾU</div>
+                    <div style="font-size:20px;font-weight:800;color:#D97706;">${miss}</div>
                 </div>
             </div>
+            <div style="max-height:400px;overflow-y:auto;padding-right:4px;">`;
 
-            <div style="display:flex; gap:10px; margin-bottom:16px;">
-                <div style="flex:1; background:#D1FAE5; border-left:4px solid #10B981; padding:10px 14px; border-radius:8px;">
-                    <div style="font-size:11px; color:#065F46; font-weight:700;">KHỚP</div>
-                    <div style="font-size:22px; font-weight:800; color:#059669;">${ok}</div>
-                </div>
-                <div style="flex:1; background:#FEE2E2; border-left:4px solid #EF4444; padding:10px 14px; border-radius:8px;">
-                    <div style="font-size:11px; color:#991B1B; font-weight:700;">LỆCH</div>
-                    <div style="font-size:22px; font-weight:800; color:#DC2626;">${diff}</div>
-                </div>
-                <div style="flex:1; background:#FEF3C7; border-left:4px solid #F59E0B; padding:10px 14px; border-radius:8px;">
-                    <div style="font-size:11px; color:#92400E; font-weight:700;">THIẾU</div>
-                    <div style="font-size:22px; font-weight:800; color:#D97706;">${missing}</div>
-                </div>
-                ${autoFixed > 0 ? `
-                <div style="flex:1; background:#E0E7FF; border-left:4px solid #6366F1; padding:10px 14px; border-radius:8px;">
-                    <div style="font-size:11px; color:#3730A3; font-weight:700;">🔧 TỰ SỬA</div>
-                    <div style="font-size:22px; font-weight:800; color:#4F46E5;">${autoFixed}</div>
-                </div>` : ''}
-            </div>
-
-            <table style="width:100%; border-collapse:collapse; font-size:13px; font-family:monospace;">
-                <thead>
-                    <tr style="background:#F1F5F9;">
-                        <th style="padding:8px 6px; text-align:left; font-size:11px; color:#475569; border-bottom:2px solid #CBD5E1;">Ngày</th>
-                        <th style="padding:8px 6px; text-align:left; font-size:11px; color:#475569; border-bottom:2px solid #CBD5E1;">Loại</th>
-                        <th style="padding:8px 6px; text-align:center; font-size:11px; color:#475569; border-bottom:2px solid #CBD5E1;">Vào App→HR</th>
-                        <th style="padding:8px 6px; text-align:center; font-size:11px; color:#475569; border-bottom:2px solid #CBD5E1;">Ra App→HR</th>
-                        <th style="padding:8px 6px; text-align:center; font-size:11px; color:#475569; border-bottom:2px solid #CBD5E1;">BT</th>
-                        <th style="padding:8px 6px; text-align:center; font-size:11px; color:#475569; border-bottom:2px solid #CBD5E1;">TC</th>
-                        <th style="padding:8px 6px; text-align:center; font-size:11px; color:#475569; border-bottom:2px solid #CBD5E1;">KQ</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-
-        for (const r of results) {
+        res.forEach(r => {
             const isOk = r.status === 'ok';
-            const isDiff = r.status === 'diff';
-            const isMissing = r.status === 'missing';
+            const isMiss = r.status === 'missing';
+            const cls = isOk ? 'ocr-card-ok' : isMiss ? 'ocr-card-miss' : 'ocr-card-diff';
+            const icon = isOk ? '✅' : isMiss ? '⚠️' : '❌';
+            const statusText = isOk ? 'Khớp' : isMiss ? 'Thiếu (App)' : 'Lệch';
 
-            let rowBg = '#FFFFFF';
-            if (isOk) rowBg = '#F0FDF4';
-            else if (isDiff) rowBg = '#FEF2F2';
-            else if (isMissing) rowBg = '#FFFBEB';
-
-            const [, mo, d] = r.date.split('-');
-            const dateShort = `${d}/${mo}`;
-            const typeLabel = r.isNight ? '🌙 Đêm' : '☀️ Ngày';
-
-            const appStart = r.appLog ? r.appLog.start : '—';
-            const hrStart = r.hr.start || '—';
-            const startMatch = r.fields && r.fields.start !== false;
-            const startColor = (r.appLog && !startMatch) ? '#DC2626' : '#1E293B';
-            const startIcon = r.appLog ? (startMatch ? ' ✓' : ' ✗') : '';
-            const startCell = r.appLog ? `${appStart}→${hrStart}${startIcon}` : `${hrStart}`;
-
-            const appEnd = r.appLog ? r.appLog.end : '—';
-            const hrEnd = r.hr.end || '—';
-            const endMatch = r.fields && r.fields.end !== false;
-            const endColor = (r.appLog && !endMatch) ? '#DC2626' : '#1E293B';
-            const endIcon = r.appLog ? (endMatch ? ' ✓' : ' ✗') : '';
-            const endCell = r.appLog ? `${appEnd}→${hrEnd}${endIcon}` : `${hrEnd}`;
-
-            const appReg = r.appLog ? (r.appLog.regularHours || 0).toFixed(0) : '—';
-            const hrReg = r.hr.regularHours != null ? String(r.hr.regularHours) : '—';
-            const regMatch = r.fields && r.fields.reg !== false;
-            const regColor = (r.appLog && !regMatch) ? '#DC2626' : '#1E293B';
-            const regIcon = r.appLog ? (regMatch ? ' ✓' : ' ✗') : '';
-            const regCell = r.appLog ? `${appReg}→${hrReg}${regIcon}` : `${hrReg}`;
-
-            const appOT = r.appLog ? (r.appLog.overtimeHours || 0).toFixed(2) : '—';
-            const hrOT = r.hr.overtimeHours != null ? String(r.hr.overtimeHours) : '—';
-            const otMatch = r.fields && r.fields.ot !== false;
-            const otColor = (r.appLog && !otMatch) ? '#DC2626' : '#1E293B';
-            const otIcon = r.hr.autoFixed ? ' 🔧' : (r.appLog ? (otMatch ? ' ✓' : ' ✗') : '');
-            const otCell = r.appLog ? `${appOT}→${hrOT}${otIcon}` : `${hrOT}`;
-
-            const kqIcon = isOk ? '✅' : isDiff ? '❌' : '⚠️';
-            const kqText = isOk ? 'Khớp' : isDiff ? 'Lệch' : 'Thiếu';
-            const kqColor = isOk ? '#059669' : isDiff ? '#DC2626' : '#D97706';
+            const appS = r.appLog ? r.appLog.start : '—';
+            const appE = r.appLog ? r.appLog.end : '—';
+            const appR = r.appLog ? r.appLog.regularHours : '—';
+            const appO = r.appLog ? r.appLog.overtimeHours : '—';
 
             html += `
-                <tr style="background:${rowBg}; border-bottom:1px solid #E2E8F0;">
-                    <td style="padding:8px 6px; font-weight:700; color:#1E293B;">${dateShort}</td>
-                    <td style="padding:8px 6px; color:#475569;">${typeLabel}</td>
-                    <td style="padding:8px 6px; text-align:center; color:${startColor}; font-weight:600;">${startCell}</td>
-                    <td style="padding:8px 6px; text-align:center; color:${endColor}; font-weight:600;">${endCell}</td>
-                    <td style="padding:8px 6px; text-align:center; color:${regColor}; font-weight:600;">${regCell}</td>
-                    <td style="padding:8px 6px; text-align:center; color:${otColor}; font-weight:600;">${otCell}</td>
-                    <td style="padding:8px 6px; text-align:center; color:${kqColor}; font-weight:800; font-size:12px;">${kqIcon} ${kqText}</td>
-                </tr>`;
-        }
+                <div class="ocr-card ${cls}">
+                    <div class="ocr-card-head">
+                        <span>${r.date} ${r.hrIsSunday ? '(CN)' : ''}</span>
+                        <span>${icon} ${statusText}</span>
+                    </div>
+                    <div class="ocr-grid">
+                        <div class="lbl">Giờ</div>
+                        <div style="text-align:center;font-weight:700;">App</div>
+                        <div style="text-align:center;font-weight:700;">HR</div>
+
+                        <div class="lbl">Vào</div>
+                        <div class="ocr-cell ${r.fields.start === false ? 'diff' : 'match'}">${appS}</div>
+                        <div class="ocr-cell ${r.fields.start === false ? 'diff' : 'match'}">${r.hr.start || '缺卡'}</div>
+
+                        <div class="lbl">Ra</div>
+                        <div class="ocr-cell ${r.fields.end === false ? 'diff' : 'match'}">${appE}</div>
+                        <div class="ocr-cell ${r.fields.end === false ? 'diff' : 'match'}">${r.hr.end || '缺卡'}</div>
+
+                        <div class="lbl">BT</div>
+                        <div class="ocr-cell ${r.fields.reg === false ? 'diff' : 'match'}">${appR}h</div>
+                        <div class="ocr-cell ${r.fields.reg === false ? 'diff' : 'match'}">${r.hr.regHours}h</div>
+
+                        <div class="lbl">OT</div>
+                        <div class="ocr-cell ${r.fields.ot === false ? 'diff' : 'match'}">${appO}h</div>
+                        <div class="ocr-cell ${r.fields.ot === false ? 'diff' : 'match'}">${r.hr.otHours}h</div>
+                    </div>
+                    ${r.diffs.length > 0 ? `<div style="font-size:11px;color:#B91C1C;margin-top:8px;font-weight:700;">Lỗi: ${r.diffs.join(' · ')}</div>` : ''}
+                </div>`;
+        });
 
         html += `
-                </tbody>
-            </table>
-
-            <div style="margin-top:16px; padding-top:12px; border-top:1px solid #E2E8F0; font-size:11px; color:#64748B; line-height:1.6;">
-                <div>💡 Ngưỡng: Vào ≤ <strong>1 giờ</strong> · Ra ≤ <strong>15p</strong> · BT ≤ <strong>0.25h</strong> · TC ngày ≤ <strong>0.25h</strong> · TC đêm ≤ <strong>0.5h</strong></div>
-                <div style="margin-top:4px;">📱 TimeTracker · Adaptive OCR Engine v6 ${autoFixed > 0 ? '· 🔧 ' + autoFixed + ' dòng tự sửa TC' : ''}</div>
             </div>
-        </div>`;
+            <div style="display:flex;gap:8px;margin-top:16px;">
+                <button class="btn btn-primary" style="flex:1;" onclick="OCRCompare.exportImage()">📥 Xuất ảnh</button>
+                <button class="btn" style="flex:1;background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);" onclick="OCRCompare.clear()">Đóng</button>
+            </div>`;
 
-        return html;
+        el.innerHTML = html;
+        el.style.display = 'block';
+        document.getElementById('ocr-actions').style.display = 'none';
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  12. PROGRESS
-    // ═══════════════════════════════════════════════════════════
+    // ═══ 7. LUỒNG CHÍNH ═══
+    async function processImage(file) {
+        if (state.isProcessing) return;
+        state.isProcessing = true;
+        showProgress();
+
+        try {
+            const blob = await preprocessImage(file);
+            const worker = await initWorker();
+            
+            updateProgress(50, 'Đang đọc ảnh...');
+            const res = await worker.recognize(blob);
+            const text = res.data.text || '';
+
+            updateProgress(90, 'Đang phân tích...');
+            const rows = parseHRText(text);
+
+            if (rows.length === 0) {
+                hideProgress();
+                const el = document.getElementById('ocr-result');
+                el.innerHTML = `<div style="background:#FEE2E2;padding:16px;border-radius:12px;text-align:center;">
+                    <p style="font-weight:700;color:#991B1B;">Không đọc được dòng nào hợp lệ.</p>
+                    <p style="font-size:12px;color:#7F1D1D;margin-top:4px;">Thử chụp rõ hơn hoặc dùng nút Xóa để chụp lại.</p>
+                </div>`;
+                el.style.display = 'block';
+                return;
+            }
+
+            state.parsedRows = rows;
+            hideProgress();
+            renderPreview();
+            
+            if (typeof toast === 'function') toast(`✅ Đọc được ${rows.length} dòng`, 'success');
+
+        } catch (err) {
+            hideProgress();
+            console.error('[OCR]', err);
+            if (typeof toast === 'function') toast('❌ ' + (err.message || 'Lỗi OCR'), 'danger');
+        } finally {
+            state.isProcessing = false;
+        }
+    }
+
+    function removeRow(idx) {
+        state.parsedRows.splice(idx, 1);
+        renderPreview();
+    }
+
+    // ═══ 8. UI HELPERS ═══
     function showProgress() {
-        document.getElementById('ocr-progress').style.display = 'block';
-        document.getElementById('ocr-result').style.display = 'none';
-        const actions = document.getElementById('ocr-actions');
-        if (actions) actions.style.display = 'none';
+        const p = document.getElementById('ocr-progress');
+        if (p) p.style.display = 'block';
+        const r = document.getElementById('ocr-result');
+        if (r) r.style.display = 'none';
         updateProgress(0, 'Đang chuẩn bị...');
     }
     function hideProgress() {
-        document.getElementById('ocr-progress').style.display = 'none';
+        const p = document.getElementById('ocr-progress');
+        if (p) p.style.display = 'none';
     }
     function updateProgress(pct, text) {
         const fill = document.getElementById('ocr-progress-fill');
         const txt = document.getElementById('ocr-progress-text');
-        if (fill) fill.style.width = Math.min(100, pct) + '%';
+        if (fill) fill.style.width = pct + '%';
         if (txt) txt.textContent = text;
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  13. HÀM CHÍNH
-    // ═══════════════════════════════════════════════════════════
-    async function processImage(file) {
-        showProgress();
-        try {
-            console.log('[OCR] === Bắt đầu ===');
-            console.log('[OCR] File gốc:', file.name, file.size, 'bytes, type:', file.type);
-
-            const processedFile = await convertHeicIfNeeded(file);
-
-            updateProgress(5, 'Đang xử lý ảnh...');
-            const processedBlob = await preprocessImage(processedFile);
-
-            updateProgress(10, 'Đang khởi tạo OCR...');
-            const w = await initWorker();
-
-            updateProgress(50, 'Đang đọc ảnh...');
-            const result = await w.recognize(processedBlob);
-            const text = result.data.text;
-            lastRawText = text;
-            console.log('[OCR] Text đầy đủ:\n', text);
-
-            updateProgress(85, 'Đang phân tích...');
-            const hrRows = parseOCRText(text);
-            console.log('[OCR] Parse được:', hrRows.length, 'dòng');
-
-            if (hrRows.length === 0) {
-                hideProgress();
-                renderRawText(text, hrRows.length);
-                if (typeof showToast === 'function') showToast('⚠️ Không parse được — xem text thô', 'warning');
-                return;
-            }
-
-            updateProgress(92, 'Đang so sánh...');
-            const results = compareWithApp(hrRows, workLogs);
-
-            if (results.length === 0) {
-                hideProgress();
-                renderRawText(text, hrRows.length);
-                if (typeof showToast === 'function') showToast('⚠️ Tất cả dòng bị lọc — xem text thô', 'warning');
-                return;
-            }
-
-            updateProgress(100, 'Hoàn tất!');
-            renderResults(results, text);
-            lastResults = results;
-
-            const okCount = results.filter(r => r.status === 'ok').length;
-            const diffCount = results.filter(r => r.status === 'diff').length;
-            const autoFixed = results.filter(r => r.hr && r.hr.autoFixed).length;
-
-            if (typeof showToast === 'function') {
-                if (diffCount === 0 && autoFixed === 0) {
-                    showToast(`✅ ${hrRows.length} ngày — tất cả khớp!`, 'success');
-                } else if (autoFixed > 0) {
-                    showToast(`⚠️ ${okCount} khớp, ${diffCount} lệch · 🔧 Tự sửa ${autoFixed} TC`, 'warning');
-                } else {
-                    showToast(`⚠️ ${okCount} khớp, ${diffCount} lệch`, 'warning');
-                }
-            }
-            setTimeout(hideProgress, 400);
-            console.log('[OCR] === Xong ===');
-        } catch (err) {
-            hideProgress();
-            console.error('[OCR] LỖI:', err);
-            let msg = 'Lỗi không xác định';
-            if (err) {
-                if (err.message) msg = err.message;
-                else if (err.name) msg = err.name;
-                else if (typeof err === 'string') msg = err;
-                else {
-                    try { msg = JSON.stringify(err); } catch (e) { msg = String(err); }
-                }
-            }
-            if (typeof showToast === 'function') showToast('❌ ' + msg, 'danger');
-            else alert('Lỗi OCR: ' + msg);
-
-            const el = document.getElementById('ocr-result');
-            if (el) {
-                el.innerHTML = `
-                    <div style="background:#FEE2E2;border:2px solid #EF4444;border-radius:12px;padding:14px;">
-                        <div style="font-weight:800;color:#991B1B;margin-bottom:8px;">❌ Lỗi OCR</div>
-                        <div style="font-size:13px;color:#7F1D1D;word-break:break-word;">${msg}</div>
-                    </div>`;
-                el.style.display = 'block';
-            }
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  14. XÓA
-    // ═══════════════════════════════════════════════════════════
     function clear() {
+        state.parsedRows = [];
+        state.lastResults = null;
         const el = document.getElementById('ocr-result');
         if (el) { el.innerHTML = ''; el.style.display = 'none'; }
-        const actions = document.getElementById('ocr-actions');
-        if (actions) actions.style.display = 'none';
-        const input = document.getElementById('hr-image-input');
-        if (input) input.value = '';
-        lastResults = null;
-        lastRawText = '';
+        document.getElementById('ocr-actions').style.display = 'none';
+        document.getElementById('hr-image-input').value = '';
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  15. INIT
-    // ═══════════════════════════════════════════════════════════
+    // ═══ INIT ═══
     function init() {
         const input = document.getElementById('hr-image-input');
         if (!input) return;
+        // Tránh gắn event 2 lần
+        if (input.dataset.ocrAttached) return;
+        input.dataset.ocrAttached = '1';
+        
         input.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            await processImage(file);
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            await processImage(f);
             e.target.value = '';
         });
     }
+
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
 
     return {
-        processImage,
-        clear,
-        exportImage,
-        getLastResults: () => lastResults,
-        getRawText: () => lastRawText
+        processImage, clear, removeRow, confirmCompare, init,
+        exportImage: () => { if (typeof toast === 'function') toast('Chức năng xuất ảnh đang phát triển', 'info'); }
     };
 })();
