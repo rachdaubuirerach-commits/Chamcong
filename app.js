@@ -613,23 +613,35 @@ function toggleSound() {
 // CALC PAY
 // ═══════════════════════════════════════════════════════════════
 function calculateWorkLog(workDate, shift, isSunday, startTimeStr, endTimeStr) {
-  const dailyRate = settings.baseSalary / Math.max(1, settings.standardWorkDays);
+  let customCfg = null;
+  try {
+    const saved = localStorage.getItem('tt_custom_payroll_config');
+    if (saved) customCfg = JSON.parse(saved);
+  } catch(e) {}
+
+  const stdDays = 26; // ÉP CỨNG 26 NGÀY CÔNG CHUẨN ĐỂ TÍNH LƯƠNG GIỜ
+  const baseSalary = customCfg ? customCfg.baseSalary : settings.baseSalary;
+  const dailyRate = baseSalary / stdDays;
   const hourlyRate = dailyRate / Math.max(0.1, settings.standardShiftHours);
+
   const [sh, sm] = startTimeStr.split(':').map(Number);
   const [eh, em] = endTimeStr.split(':').map(Number);
   const startDate = new Date(2000, 0, 1, sh, sm, 0);
   let endDate = new Date(2000, 0, 1, eh, em, 0);
   if (endDate <= startDate) endDate = new Date(endDate.getTime() + 86400000);
+  
   const totalHours = (endDate - startDate) / 3600000;
   const startHours = sh + sm / 60;
   const endHours = startHours + totalHours;
-  const paidHoliday = typeof HolidayResolver !== 'undefined'
-    ? HolidayResolver.getPaidHoliday(workDate) : null;
+  
+  const paidHoliday = typeof HolidayResolver !== 'undefined' ? HolidayResolver.getPaidHoliday(workDate) : null;
   const isSpecialDay = isSunday || !!paidHoliday;
+  
   let regularHours = 0, overtimeHours = 0;
   const standardStart = shift === 'Sáng' ? 7.5 : 19.5;
   const tcStartHours = shift === 'Sáng' ? 16.5 : 28.5;
   const bonusThreshold = shift === 'Sáng' ? 19.5 : 31.5;
+
   if (isSpecialDay) {
     let worked = totalHours;
     if (totalHours >= 8) worked -= 0.5;
@@ -639,12 +651,15 @@ function calculateWorkLog(workDate, shift, isSunday, startTimeStr, endTimeStr) {
     if (worked < 0) worked = 0;
     regularHours = 0;
     overtimeHours = worked;
+    
     if (endHours >= bonusThreshold) overtimeHours += 0.5;
     if (shift === 'Đêm' && overtimeHours > 0) overtimeHours += 0.25;
+    
   } else {
     let ot = 0;
     if (endHours > tcStartHours) {
       ot = endHours - tcStartHours;
+      
       if (ot >= 3) ot += 0.5;
       if (shift === 'Đêm') ot += 0.25;
     }
@@ -652,23 +667,34 @@ function calculateWorkLog(workDate, shift, isSunday, startTimeStr, endTimeStr) {
     const late = Math.max(0, startHours - standardStart);
     regularHours = Math.max(0, 8 - late);
   }
+  
   regularHours = Math.round(regularHours * 100) / 100;
   overtimeHours = Math.round(overtimeHours * 100) / 100;
+  
   const regularPay = regularHours * hourlyRate;
   let overtimePay = 0;
+  
   if (overtimeHours > 0) {
     let coeff;
-    if (paidHoliday || isSunday) coeff = shift === 'Sáng' ? settings.otSundayDay : settings.otSundayNight;
-    else coeff = shift === 'Sáng' ? settings.otNormalDay : settings.otNormalNight;
+    const cNormalDay = customCfg ? customCfg.otNormalDay : settings.otNormalDay;
+    const cNormalNight = customCfg ? customCfg.otNormalNight : settings.otNormalNight;
+    const cSundayDay = customCfg ? customCfg.otSundayDay : settings.otSundayDay;
+    const cSundayNight = customCfg ? customCfg.otSundayNight : settings.otSundayNight;
+    const cHoliday = customCfg ? customCfg.otHoliday : settings.otHoliday;
+
+    if (paidHoliday) coeff = cHoliday;
+    else if (isSunday) coeff = shift === 'Sáng' ? cSundayDay : cSundayNight;
+    else coeff = shift === 'Sáng' ? cNormalDay : cNormalNight;
+    
     overtimePay = overtimeHours * hourlyRate * coeff;
   }
+  
   return {
     regularHours, overtimeHours,
     totalPay: Math.round(regularPay + overtimePay),
     isPaidHoliday: !!paidHoliday, holiday: paidHoliday
   };
 }
-
 // ═══════════════════════════════════════════════════════════════
 // SWITCH PAGE
 // ═══════════════════════════════════════════════════════════════

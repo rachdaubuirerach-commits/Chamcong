@@ -8,6 +8,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
 <title>TimeTracker</title>
+<script>
+  // TẠM THỜI: Xóa dòng này sau khi test xong
+  localStorage.removeItem('tt_tutorial_v4_seen');
+</script>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="style-effects.css">
 </head>
@@ -711,7 +715,16 @@
 <script src="effects.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="image-export.js"></script>
-<script src="ai-chat.js"></script>
+<!-- ... các script cũ ... -->
 <script src="app.js"></script>
+<!-- Thứ tự nhúng file bắt buộc -->
+<script src="payroll-config.js"></script>
+<script src="payroll-engine.js"></script>
+<script src="payroll-override.js"></script>
+<script src="leave-manager.js"></script>
+<script src="payroll-ui.js"></script>
+<script src="tutorial.js"></script>
+</body>
+</html>
 </body>
 </html>
