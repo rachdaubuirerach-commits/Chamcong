@@ -1,6 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
    ios-safe-area-fix.css — Sửa lỗi đè Status Bar (tai thỏ) trên iOS
-   Sử dụng env(safe-area-inset-top) để tự động đẩy nội dung xuống
    ═══════════════════════════════════════════════════════════════ */
 
 /* 1. Header của trang chủ (Home) */
@@ -13,14 +12,41 @@
   padding-top: calc(26px + env(safe-area-inset-top)) !important;
 }
 
-/* 3. Tăng nhẹ khoảng cách cho App-bar để nút bấm không bị sát mép */
-.app-bar {
-  margin-top: 6px;
+/* 3. Menu (Drawer) và các Sheet trượt từ cạnh phải */
+.drawer-panel {
+  padding-top: calc(24px + env(safe-area-inset-top)) !important;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom)) !important;
 }
 
-/* 4. Đảm bảo vùng chạm (touch target) của các nút menu đủ lớn (chuẩn Apple 44px) */
-.app-bar-btn, 
-.btn-menu {
+/* 4. Các bảng trượt từ dưới lên (Chi tiết ngày, Bottom Sheet) */
+.bottom-sheet-panel {
+  padding-bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+}
+
+/* 5. Thanh điều hướng dưới cùng (Bottom Nav) */
+.bottom-nav {
+  padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+  margin-bottom: 16px; 
+}
+
+/* 6. Màn hình khóa PIN */
+.pin-lock {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 7. Tăng vùng chạm (touch target) cho nút đóng (X) và các nút icon */
+.drawer-close, 
+.bottom-sheet-close,
+.app-bar-btn {
   min-width: 44px !important;
   min-height: 44px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 8. Điều chỉnh lại khoảng cách của App-bar một chút cho đẹp */
+.app-bar {
+  margin-top: 6px;
 }
