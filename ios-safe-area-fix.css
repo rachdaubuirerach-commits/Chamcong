@@ -1,0 +1,26 @@
+/* ═══════════════════════════════════════════════════════════════
+   ios-safe-area-fix.css — Sửa lỗi đè Status Bar (tai thỏ) trên iOS
+   Sử dụng env(safe-area-inset-top) để tự động đẩy nội dung xuống
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 1. Header của trang chủ (Home) */
+.hero-header {
+  padding-top: calc(20px + env(safe-area-inset-top)) !important;
+}
+
+/* 2. Header của các trang con (Lịch, Chấm công, Thống kê) */
+.page-header {
+  padding-top: calc(26px + env(safe-area-inset-top)) !important;
+}
+
+/* 3. Tăng nhẹ khoảng cách cho App-bar để nút bấm không bị sát mép */
+.app-bar {
+  margin-top: 6px;
+}
+
+/* 4. Đảm bảo vùng chạm (touch target) của các nút menu đủ lớn (chuẩn Apple 44px) */
+.app-bar-btn, 
+.btn-menu {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
