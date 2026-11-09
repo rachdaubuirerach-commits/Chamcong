@@ -41,21 +41,33 @@
     const p = PayrollEngine.calculate(m, y, monthLogs, data.settings.standardShiftHours);
     const companyName = getCompanyName();
     
-    // Cấu hình khung (Xuất ảnh rộng 800px, hiển thị trên app thì auto)
     const boxStyle = isExport 
       ? 'width: 800px; padding: 40px; background: #ffffff; box-sizing: border-box; font-family: Arial, sans-serif;' 
       : 'background:#fff;color:#000;padding:16px;font-family:Arial,sans-serif;max-width:100%;box-sizing:border-box;border-radius:12px;';
 
-    // CSS cho bảng
-    const thStyle = 'background:#0f172a;color:#fff;padding:' + (isExport ? '14px 16px' : '12px') + ';font-weight:700;font-size:' + (isExport ? '13px' : '11px') + ';text-transform:uppercase;white-space:nowrap;border:none;';
-    const tdBase = 'padding:' + (isExport ? '14px 16px' : '12px 10px') + ';border-bottom:1px solid #f1f5f9;font-size:' + (isExport ? '14px' : '12px') + ';white-space:nowrap;';
-    
+    // Cấu hình bảng: Nếu xuất ảnh thì cố định cột, nếu hiển thị app thì để tự động
+    const colgroup = isExport ? `
+      <colgroup>
+        <col style="width: 40%;">
+        <col style="width: 20%;">
+        <col style="width: 15%;">
+        <col style="width: 25%;">
+      </colgroup>
+    ` : '';
+
+    const tableStyle = 'width:100%;border-collapse:collapse;' + (isExport ? 'table-layout:fixed;' : 'table-layout:auto;');
+    const thStyle = 'background:#0f172a;color:#fff;padding:' + (isExport ? '14px 16px' : '10px 8px') + ';font-weight:700;font-size:' + (isExport ? '13px' : '11px') + ';text-transform:uppercase;border:none;' + (isExport ? 'white-space:nowrap;' : 'word-break:break-word;');
+    const tdBase = 'padding:' + (isExport ? '14px 16px' : '10px 8px') + ';border-bottom:1px solid #f1f5f9;font-size:' + (isExport ? '14px' : '12px') + ';';
+    const tdLabel = tdBase + 'text-align:left;color:#334155;word-break:break-word;';
+    const tdNum = tdBase + 'white-space:nowrap;text-align:right;color:#64748b;';
+    const tdCenter = tdBase + 'white-space:nowrap;text-align:center;color:#64748b;';
+
     const hRow = (label, baseAmount, qty, actualAmount, bold = false) => `
       <tr style="${bold ? 'background:#f8fafc;font-weight:800;border-top:1.5px solid #e2e8f0;' : ''}">
-        <td style="${tdBase}text-align:left;color:#334155;font-weight:${bold ? '800' : '500'};">${label}</td>
-        <td style="${tdBase}text-align:right;color:#64748b;">${baseAmount}</td>
-        <td style="${tdBase}text-align:center;color:#64748b;">${qty}</td>
-        <td style="${tdBase}text-align:right;color:${bold ? '#0f172a' : '#1e293b'};font-weight:${bold ? '800' : '600'};">${formatMoney(actualAmount)}</td>
+        <td style="${tdLabel}font-weight:${bold ? '800' : '500'};">${label}</td>
+        <td style="${tdNum}">${baseAmount}</td>
+        <td style="${tdCenter}">${qty}</td>
+        <td style="${tdNum}font-weight:${bold ? '800' : '600'};color:#1e293b;">${formatMoney(actualAmount)}</td>
       </tr>`;
 
     const fixedRowsHTML = p.fixedRows.map(r => {
@@ -70,13 +82,11 @@
     if (p.ot.sundayNightH > 0) otRows += hRow('Tăng ca Chủ nhật (Đêm)', `${p.ot.sundayNightCoeff}x`, p.ot.sundayNightH + 'h', p.ot.sundayNightPay);
     if (p.nightHours > 0) otRows += hRow('Phụ cấp ca đêm', `30%`, p.nightHours + 'h', p.nightShiftPay);
 
-    // Khung bảng bo góc
     const tableWrapperStyle = 'border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:24px;';
 
     return `
       <div style="${boxStyle}">
         
-        <!-- HEADER PHIẾU LƯƠNG -->
         <div style="text-align:center; margin-bottom: 30px;">
           <div style="font-size:${isExport ? '24px' : '18px'}; font-weight:900; text-transform:uppercase; color:#0f172a; letter-spacing:-0.5px; margin-bottom: 8px;">
             ${companyName}
@@ -86,7 +96,6 @@
           </div>
         </div>
 
-        <!-- KHỐI THÔNG TIN NHÂN VIÊN -->
         <div style="display:flex; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:${isExport ? '20px 24px' : '16px'}; margin-bottom:24px;">
           <div>
             <div style="font-size:12px; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Họ và Tên</div>
@@ -102,15 +111,9 @@
           </div>
         </div>
         
-        <!-- BẢNG LƯƠNG & PHỤ CẤP -->
         <div style="${tableWrapperStyle}">
-          <table style="width:100%;border-collapse:collapse;">
-            <colgroup>
-              <col style="width: 45%;">
-              <col style="width: 20%;">
-              <col style="width: 15%;">
-              <col style="width: 20%;">
-            </colgroup>
+          <table style="${tableStyle}">
+            ${colgroup}
             <thead>
               <tr>
                 <th style="${thStyle} text-align:left; border-radius: 12px 0 0 0;">Mục lục</th>
@@ -127,16 +130,10 @@
           </table>
         </div>
 
-        <!-- BẢNG TĂNG CA (NẾU CÓ) -->
         ${otRows ? `
         <div style="${tableWrapperStyle}">
-          <table style="width:100%;border-collapse:collapse;">
-            <colgroup>
-              <col style="width: 45%;">
-              <col style="width: 20%;">
-              <col style="width: 15%;">
-              <col style="width: 20%;">
-            </colgroup>
+          <table style="${tableStyle}">
+            ${colgroup}
             <thead>
               <tr>
                 <th style="${thStyle} text-align:left; border-radius: 12px 0 0 0;">Khoản khác</th>
@@ -151,39 +148,31 @@
           </table>
         </div>` : ''}
 
-        <!-- KHỐI TỔNG KẾT -->
         <div style="background:#ffffff; border:1.5px solid #e2e8f0; border-radius:16px; padding:${isExport ? '24px' : '16px'};">
-          
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid #f1f5f9;">
             <span style="font-size:${isExport ? '16px' : '14px'}; font-weight:800; color:#0f172a; text-transform:uppercase;">Tổng Thu Nhập</span>
             <span style="font-size:${isExport ? '18px' : '16px'}; font-weight:800; color:#0f172a;">${formatMoney(p.grossIncome)}</span>
           </div>
-
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <span style="font-size:${isExport ? '14px' : '12px'}; color:#dc2626; font-weight:600;">Truy thuế TN (10.5%)</span>
             <span style="font-size:${isExport ? '14px' : '12px'}; color:#dc2626; font-weight:700;">- ${formatMoney(p.insurance)}</span>
           </div>
-          
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <span style="font-size:${isExport ? '14px' : '12px'}; color:#dc2626; font-weight:600;">Công đoàn</span>
             <span style="font-size:${isExport ? '14px' : '12px'}; color:#dc2626; font-weight:700;">- ${formatMoney(p.unionFee)}</span>
           </div>
-
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; padding-top:16px; border-top:2px dashed #cbd5e1;">
             <span style="font-size:${isExport ? '18px' : '15px'}; font-weight:900; color:#16a34a; text-transform:uppercase;">Thực Lĩnh</span>
             <span style="font-size:${isExport ? '24px' : '20px'}; font-weight:900; color:${p.netIncome < 0 ? '#dc2626' : '#16a34a'};">${formatMoney(p.netIncome)}</span>
           </div>
-
           ${p.netIncome < 0 ? `<div style="text-align:center;font-size:12px;color:#dc2626;margin-top:8px;font-weight:600;">(Bạn chưa làm đủ ngày để bù trừ các khoản phí)</div>` : ''}
         </div>
         
-        <!-- CHÂN TRANG (CHỈ HIỆN KHI XUẤT ẢNH) -->
         ${isExport ? `
         <div style="text-align:center; margin-top:40px; font-size:12px; color:#94a3b8; font-weight:600;">
           Phiếu lương được tạo tự động bởi TimeTracker • ${new Date().toLocaleDateString('vi-VN')}
         </div>` : ''}
 
-        <!-- NÚT BẤM (ẨN KHI XUẤT ẢNH) -->
         ${!isExport ? `
         <div style="margin-top:24px;text-align:center;" data-html2canvas-ignore="true">
           <button onclick="window.PayrollUI.exportPNG(this)" style="padding:12px 24px;background:#0f172a;color:#fff;border:none;border-radius:10px;font-weight:bold;cursor:pointer;margin-right:8px;font-size:13px;">📥 Tải ảnh</button>
@@ -267,7 +256,6 @@
     const m = parseInt(document.getElementById('payroll-month-select').value);
     const y = parseInt(document.getElementById('payroll-year-input').value);
     
-    // Tạo khung in ảo (Rộng 800px, nằm ngoài màn hình)
     const printContainer = document.createElement('div');
     printContainer.style.cssText = 'position:fixed;left:-9999px;top:0;z-index:-1;width:800px;';
     printContainer.innerHTML = renderPayslipHTML(m, y, true);
@@ -275,7 +263,7 @@
 
     setTimeout(() => {
       html2canvas(printContainer.firstElementChild, {
-        scale: 2.5, // Độ phân giải siêu nét
+        scale: 2.5, 
         backgroundColor: '#ffffff',
         useCORS: true,
         windowWidth: 800

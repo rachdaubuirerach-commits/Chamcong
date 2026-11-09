@@ -24,13 +24,12 @@ const PayrollEngine = (function () {
     const stdDaysDisplay = getStandardWorkDays(month, year);
     const leaves = getLeaveTypes();
     
-    // Lấy ngày hôm nay
     const now = new Date();
-    const todayStr = `${year}-${String(month).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const isCurrentMonth = (month === now.getMonth() + 1 && year === now.getFullYear());
+    // SỬA LỖI TẠI ĐÂY: Lấy ngày thực tế của hôm nay, không ghép với tháng đang xem
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const daysInMonth = new Date(year, month, 0).getDate();
     
-    // SỬA LỖI TẠI ĐÂY: Chỉ chốt vắng mặt từ ngày HÔM KIA trở về trước (now.getDate() - 2)
     let checkUpToDay = daysInMonth;
     if (isCurrentMonth) {
       checkUpToDay = now.getDate() > 2 ? now.getDate() - 2 : 0;
@@ -52,7 +51,6 @@ const PayrollEngine = (function () {
     
     Object.keys(leaves).forEach(dateStr => {
       const d = new Date(dateStr + 'T00:00:00');
-      // Chỉ tính những ngày nghỉ từ hôm nay trở về trước
       if (d.getMonth() + 1 === month && d.getFullYear() === year && dateStr <= todayStr) {
         const isSunday = d.getDay() === 0;
         const mmdd = `${String(month).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -73,18 +71,20 @@ const PayrollEngine = (function () {
 
     const validLogs = logs.filter(l => !leaves[l.date]);
     
+    // Đếm ngày công thực tế (tự tính isSunday từ ngày, bỏ qua trường isSunday bị lỗi trong data cũ)
     let actualDays = 0;
     let actualDaysInPast = 0;
     validLogs.forEach(l => {
       const d = new Date(l.date + 'T00:00:00');
       const isPastOrToday = l.date <= todayStr;
-      if (!l.isSunday && !l.isPaidHoliday && isPastOrToday) {
+      const dow = d.getDay();
+      
+      if (dow !== 0 && !l.isPaidHoliday && isPastOrToday) {
         actualDays++;
         if (d.getDate() <= checkUpToDay) actualDaysInPast++;
       }
     });
 
-    // Tính số ngày tự động vắng (chỉ tính những ngày đã qua)
     let autoMissedDays = stdDaysPassed - (actualDaysInPast + paidLeavesInPast + manualUnpaidLeavesInPast);
     if (autoMissedDays < 0) autoMissedDays = 0;
 
@@ -92,10 +92,11 @@ const PayrollEngine = (function () {
     const totalPaidDays = actualDays + paidLeaveDays;
     const calcRatio = totalPaidDays / 26; 
 
-    const normalNightShifts = validLogs.filter(l => 
-      l.shift === 'Đêm' && !l.isSunday && !l.isPaidHoliday && 
-      (l.regularHours > 0 || l.overtimeHours > 0)
-    ).length;
+    const normalNightShifts = validLogs.filter(l => {
+      const d = new Date(l.date + 'T00:00:00');
+      const dow = d.getDay();
+      return l.shift === 'Đêm' && dow !== 0 && !l.isPaidHoliday && (l.regularHours > 0 || l.overtimeHours > 0);
+    }).length;
     const totalNightHours = normalNightShifts * 7; 
 
     const baseSalaryCfg = Number(cfg.fixedEarnings.find(e => e.id === 'base')?.amount) || 5939400;
@@ -108,7 +109,6 @@ const PayrollEngine = (function () {
       return { name: e.name, qty: `${actualDays}/${stdDaysDisplay}`, amount: amt };
     });
 
-    // Mất chuyên cần nếu có bất kỳ ngày nghỉ việc riêng nào
     const isFullAttendance = (totalPaidDays >= stdDaysDisplay) && (unpaidLeaveDays === 0);
     const attendanceBonus = isFullAttendance ? 300000 : 0; 
     const appraisalBonus = 500000;
@@ -119,8 +119,11 @@ const PayrollEngine = (function () {
     validLogs.forEach(l => {
       const otH = Number(l.overtimeHours) || 0;
       const isNight = l.shift === 'Đêm';
+      const d = new Date(l.date + 'T00:00:00');
+      const isSunday = d.getDay() === 0; // Tự tính lại
+
       if (otH > 0) {
-        if (l.isSunday) {
+        if (isSunday) {
           if (!isNight) otSundayDayH += otH;
           else {
             const split = 9.3;

@@ -4,12 +4,7 @@
   function getCustomConfig() {
     let cfg = localStorage.getItem('tt_custom_payroll_config');
     if (cfg) return JSON.parse(cfg);
-    return {
-      baseSalary: 5939400,
-      otNormalDay: 1.5, otNormalNight: 1.7,
-      otSundayDay: 2.0, otSundayNight: 2.7,
-      otHoliday: 3.0
-    };
+    return { baseSalary: 5939400, otNormalDay: 1.5, otNormalNight: 1.7, otSundayDay: 2.0, otSundayNight: 2.7, otHoliday: 3.0 };
   }
 
   function getTodayStr() {
@@ -27,89 +22,39 @@
   }
 
   // ==========================================
-  // HÀM QUÉT VÀ CHẤM BÙ NGÀY QUÊN
+  // TỰ ĐỘNG SỬA LỖI DỮ LIỆU CŨ (Chạy ngay khi tải file)
   // ==========================================
-  window.bulkFillMissedDays = function(shiftType) {
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const year = now.getFullYear();
-    const today = now.getDate();
-    
+  setTimeout(() => {
     const logKey = getProfileKey('worklogs');
     let logs = [];
     try { logs = JSON.parse(localStorage.getItem(logKey) || '[]'); } catch(e) {}
-    const leaves = getLeaves();
     
-    const missedDates = [];
-    
-    for (let d = 1; d <= today; d++) {
-      const dateObj = new Date(year, month - 1, d);
-      const ds = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const isSunday = dateObj.getDay() === 0;
-      const isHoliday = typeof HolidayResolver !== 'undefined' && HolidayResolver.getPaidHoliday(ds);
-      
-      // Chỉ xét ngày thường, không phải ngày nghỉ phép, và chưa có log
-      if (!isSunday && !isHoliday && !leaves[ds] && !logs.some(l => l.date === ds)) {
-        missedDates.push(ds);
+    let hasChanged = false;
+    logs.forEach(l => {
+      const d = new Date(l.date + 'T00:00:00');
+      const actualIsSunday = d.getDay() === 0;
+      if (l.isSunday !== actualIsSunday) {
+        l.isSunday = actualIsSunday;
+        hasChanged = true;
       }
-    }
-    
-    if (missedDates.length === 0) {
-      if (typeof window.toast === 'function') window.toast('Tuyệt vời! Không có ngày nào bị quên chấm công.', 'success');
-      return;
-    }
-    
-    if (!shiftType) return missedDates; // Trả về danh sách cho UI hiển thị
-    
-    // Tiến hành chấm bù tự động
-    let settings = { morningStart: '07:30', morningEnd: '19:30', nightStart: '19:30', nightEnd: '07:30' };
-    try { const s = localStorage.getItem(getProfileKey('settings')); if (s) Object.assign(settings, JSON.parse(s)); } catch (e) {}
-    
-    const start = shiftType === 'Sáng' ? (settings.morningStart || '07:30') : (settings.nightStart || '19:30');
-    const end = shiftType === 'Sáng' ? (settings.morningEnd || '19:30') : (settings.nightEnd || '07:30');
-    
-    missedDates.forEach(ds => {
-      const isSun = new Date(ds + 'T00:00:00').getDay() === 0;
-      const calc = window.calculateWorkLog(ds, shiftType, isSun, start, end);
-      logs.push({
-        id: Date.now() + Math.random(),
-        date: ds,
-        shift: shiftType,
-        isSunday: isSun,
-        start: start,
-        end: end,
-        regularHours: calc.regularHours,
-        overtimeHours: calc.overtimeHours,
-        totalPay: calc.totalPay,
-        isPaidHoliday: calc.isPaidHoliday,
-        note: 'Chấm bù'
-      });
     });
     
-    localStorage.setItem(logKey, JSON.stringify(logs));
-    
-    if (typeof window.toast === 'function') window.toast(`Đã chấm bù thành công ${missedDates.length} ngày ca ${shiftType}!`, 'success');
-    
-    const page = document.body.dataset.page || 'home';
-    if (typeof window.switchPage === 'function') window.switchPage(page);
-    if (window.renderCalendar) window.renderCalendar();
-  };
+    if (hasChanged) {
+      localStorage.setItem(logKey, JSON.stringify(logs));
+      console.log('Đã tự động sửa lại dữ liệu ngày Chủ nhật bị lỗi!');
+    }
+  }, 1000);
 
-  // ==========================================
-  // GHI ĐÈ HÀM TÍNH LƯƠNG
-  // ==========================================
   window.calculateWorkLog = function(workDate, shift, isSunday, startTimeStr, endTimeStr) {
     try {
       const cfg = getCustomConfig();
       const d = new Date(workDate + 'T00:00:00');
-      
       let stdDays = 26;
       if (typeof PayrollEngine !== 'undefined' && PayrollEngine.getStandardWorkDays) {
           stdDays = PayrollEngine.getStandardWorkDays(d.getMonth() + 1, d.getFullYear());
       }
       
       const hourlyRate = cfg.baseSalary / stdDays / 8;
-
       const [sh, sm] = (startTimeStr || '07:30').split(':').map(Number);
       const [eh, em] = (endTimeStr || '19:30').split(':').map(Number);
       const startDate = new Date(2000, 0, 1, sh, sm, 0);
@@ -119,7 +64,6 @@
       const totalHours = (endDate - startDate) / 3600000;
       const startHours = sh + sm / 60;
       const endHours = startHours + totalHours;
-      
       const paidHoliday = typeof HolidayResolver !== 'undefined' ? HolidayResolver.getPaidHoliday(workDate) : null;
       const isSpecialDay = isSunday || !!paidHoliday;
       
@@ -137,10 +81,8 @@
         if (worked < 0) worked = 0;
         regularHours = 0;
         overtimeHours = worked;
-        
         if (endHours >= bonusThreshold) overtimeHours += 0.5;
         if (shift === 'Đêm' && overtimeHours > 0) overtimeHours += 0.25;
-        
       } else {
         let ot = 0;
         if (endHours > tcStartHours) {
@@ -155,7 +97,6 @@
       
       regularHours = Math.round(regularHours * 100) / 100;
       overtimeHours = Math.round(overtimeHours * 100) / 100;
-      
       const regularPay = regularHours * hourlyRate;
       let overtimePay = 0;
       
@@ -164,7 +105,6 @@
         if (paidHoliday) coeff = cfg.otHoliday;
         else if (isSunday) coeff = shift === 'Sáng' ? cfg.otSundayDay : cfg.otSundayNight;
         else coeff = shift === 'Sáng' ? cfg.otNormalDay : cfg.otNormalNight;
-        
         overtimePay = overtimeHours * hourlyRate * coeff;
       }
       
@@ -174,19 +114,14 @@
         isPaidHoliday: !!paidHoliday, holiday: paidHoliday
       };
     } catch (e) {
-      console.error(e);
       return { regularHours: 8, overtimeHours: 0, totalPay: 0, isPaidHoliday: false };
     }
   };
 
-  // ==========================================
-  // GHI ĐÈ HÀM CHẤM CÔNG NHANH (LOGIC THÔNG MINH)
-  // ==========================================
   window.quickCheckIn = function() {
     try {
       const now = new Date();
       const hour = now.getHours();
-      
       let settings = { morningStart: '07:30', morningEnd: '19:30', nightStart: '19:30', nightEnd: '07:30' };
       try { const s = localStorage.getItem(getProfileKey('settings')); if (s) settings = { ...settings, ...JSON.parse(s) }; } catch (e) {}
       
@@ -202,11 +137,10 @@
         shift = logs[0].shift; 
       }
 
-      if (hour < 8 && shift === 'Đêm') {
+      if (shift === 'Đêm' && hour < 10) {
         const y = new Date(now); y.setDate(y.getDate() - 1);
         const yesterdayStr = `${y.getFullYear()}-${String(y.getMonth()+1).padStart(2,'0')}-${String(y.getDate()).padStart(2,'0')}`;
         if (!logs.some(l => l.date === yesterdayStr)) ts = yesterdayStr;
-        else ts = getTodayStr();
       }
       
       if (getLeaves()[ts]) {
@@ -240,14 +174,9 @@
         const page = document.body.dataset.page || 'home';
         if (typeof window.switchPage === 'function') window.switchPage(page);
       }
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) {}
   };
 
-  // ==========================================
-  // LỚP BẢO VỆ REALTIME (LỌC NGÀY NGHỈ)
-  // ==========================================
   const originalGetLogsByMonth = window.getLogsByMonth;
   window.getLogsByMonth = function(m, y) {
     if (typeof originalGetLogsByMonth !== 'function') return [];
