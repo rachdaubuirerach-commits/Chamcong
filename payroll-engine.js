@@ -24,13 +24,17 @@ const PayrollEngine = (function () {
     const stdDaysDisplay = getStandardWorkDays(month, year);
     const leaves = getLeaveTypes();
     
-    const validLogs = logs.filter(l => !leaves[l.date]);
-    const actualDays = validLogs.filter(l => !l.isSunday && !l.isPaidHoliday).length;
-    
+    // Lấy ngày hôm nay
     const now = new Date();
+    const todayStr = `${year}-${String(month).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const isCurrentMonth = (month === now.getMonth() + 1 && year === now.getFullYear());
     const daysInMonth = new Date(year, month, 0).getDate();
-    const checkUpToDay = isCurrentMonth ? now.getDate() : daysInMonth;
+    
+    // SỬA LỖI TẠI ĐÂY: Chỉ chốt vắng mặt từ ngày HÔM KIA trở về trước (now.getDate() - 2)
+    let checkUpToDay = daysInMonth;
+    if (isCurrentMonth) {
+      checkUpToDay = now.getDate() > 2 ? now.getDate() - 2 : 0;
+    }
 
     let stdDaysPassed = 0;
     for (let d = 1; d <= checkUpToDay; d++) {
@@ -42,29 +46,49 @@ const PayrollEngine = (function () {
     }
 
     let paidLeaveDays = 0;
-    let unpaidLeaveDays = 0;
+    let manualUnpaidLeaveDays = 0;
+    let paidLeavesInPast = 0;
+    let manualUnpaidLeavesInPast = 0;
     
-    // Đếm số ngày nghỉ do người dùng tự đánh dấu
     Object.keys(leaves).forEach(dateStr => {
       const d = new Date(dateStr + 'T00:00:00');
-      if (d.getMonth() + 1 === month && d.getFullYear() === year && d.getDate() <= checkUpToDay) {
+      // Chỉ tính những ngày nghỉ từ hôm nay trở về trước
+      if (d.getMonth() + 1 === month && d.getFullYear() === year && dateStr <= todayStr) {
         const isSunday = d.getDay() === 0;
         const mmdd = `${String(month).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         const isHoliday = cfg.paidHolidays && cfg.paidHolidays.includes(mmdd);
         
         if (!isSunday && !isHoliday) {
-          if (leaves[dateStr] === 'annual') paidLeaveDays++;
-          if (leaves[dateStr] === 'unpaid') unpaidLeaveDays++;
+          if (leaves[dateStr] === 'annual') {
+            paidLeaveDays++;
+            if (d.getDate() <= checkUpToDay) paidLeavesInPast++;
+          }
+          if (leaves[dateStr] === 'unpaid') {
+            manualUnpaidLeaveDays++;
+            if (d.getDate() <= checkUpToDay) manualUnpaidLeavesInPast++;
+          }
         }
       }
     });
 
-    // TỰ ĐỘNG GỘP NGÀY QUÊN CHẤM VÀO NGHỈ VIỆC RIÊNG
-    let autoMissedDays = stdDaysPassed - (actualDays + paidLeaveDays + unpaidLeaveDays);
-    if (autoMissedDays > 0) {
-      unpaidLeaveDays += autoMissedDays; 
-    }
+    const validLogs = logs.filter(l => !leaves[l.date]);
+    
+    let actualDays = 0;
+    let actualDaysInPast = 0;
+    validLogs.forEach(l => {
+      const d = new Date(l.date + 'T00:00:00');
+      const isPastOrToday = l.date <= todayStr;
+      if (!l.isSunday && !l.isPaidHoliday && isPastOrToday) {
+        actualDays++;
+        if (d.getDate() <= checkUpToDay) actualDaysInPast++;
+      }
+    });
 
+    // Tính số ngày tự động vắng (chỉ tính những ngày đã qua)
+    let autoMissedDays = stdDaysPassed - (actualDaysInPast + paidLeavesInPast + manualUnpaidLeavesInPast);
+    if (autoMissedDays < 0) autoMissedDays = 0;
+
+    const unpaidLeaveDays = manualUnpaidLeaveDays + autoMissedDays;
     const totalPaidDays = actualDays + paidLeaveDays;
     const calcRatio = totalPaidDays / 26; 
 
@@ -84,7 +108,7 @@ const PayrollEngine = (function () {
       return { name: e.name, qty: `${actualDays}/${stdDaysDisplay}`, amount: amt };
     });
 
-    // Mất chuyên cần nếu có bất kỳ ngày nghỉ việc riêng nào (kể cả quên chấm)
+    // Mất chuyên cần nếu có bất kỳ ngày nghỉ việc riêng nào
     const isFullAttendance = (totalPaidDays >= stdDaysDisplay) && (unpaidLeaveDays === 0);
     const attendanceBonus = isFullAttendance ? 300000 : 0; 
     const appraisalBonus = 500000;
@@ -125,6 +149,7 @@ const PayrollEngine = (function () {
 
     const insurance = Math.round(6239400 * 0.105);
     const unionFee = 50000;
+    
     const totalDeductions = insurance + unionFee;
     const netIncome = grossIncome - totalDeductions;
 

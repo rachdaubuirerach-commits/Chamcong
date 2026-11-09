@@ -25,7 +25,10 @@
       if (!grid) return;
       
       const now = new Date();
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+      // Tính ngày hôm qua
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
       
       const cells = grid.querySelectorAll('.cal-day');
       cells.forEach(cell => {
@@ -39,12 +42,10 @@
           let type = leaves[dateStr];
           const hoursEl = cell.querySelector('.cal-hours');
           
-          // Xóa các class và badge cũ
           cell.classList.remove('leave-annual', 'leave-unpaid', 'absent-auto');
           const oldBadge = cell.querySelector('.leave-badge');
           if (oldBadge) oldBadge.remove();
 
-          // NẾU KHÔNG CÓ LOẠI NGHỈ, KIỂM TRA XEM CÓ PHẢI NGÀY TỰ ĐỘNG VẮNG KHÔNG
           if (!type) {
             const parts = dateStr.split('-');
             if (parts.length === 3) {
@@ -52,21 +53,20 @@
               const isCurrentMonth = (m === now.getMonth() + 1 && y === now.getFullYear());
               
               if (isCurrentMonth) {
-                const isPastOrToday = dateStr <= todayStr;
+                // SỬA LỖI TẠI ĐÂY: Chỉ đánh dấu R nếu ngày nhỏ hơn HÔM QUA (tức là hôm kia trở về trước)
+                const isStrictlyPast = dateStr < yesterdayStr;
                 const dateObj = new Date(y, m - 1, d);
                 const isSunday = dateObj.getDay() === 0;
                 const isHoliday = typeof HolidayResolver !== 'undefined' && HolidayResolver.getPaidHoliday(dateStr);
                 const hasLog = logs.some(l => l.date === dateStr);
 
-                // Nếu là ngày trong quá khứ, không phải CN/Lễ, và không chấm công -> Tự động gán là 'unpaid' (R)
-                if (isPastOrToday && !isSunday && !isHoliday && !hasLog) {
+                if (isStrictlyPast && !isSunday && !isHoliday && !hasLog) {
                   type = 'unpaid'; 
                 }
               }
             }
           }
 
-          // HIỂN THỊ GIAO DIỆN
           if (type) {
             cell.classList.remove('done-normal', 'done-sunday', 'done-holiday');
             if (hoursEl) hoursEl.style.display = 'none';
@@ -87,7 +87,6 @@
             badge.style.cssText = 'position:absolute;top:-4px;right:-4px;background:#3B82F6;color:#fff;font-size:9px;font-weight:900;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 4px rgba(0,0,0,0.2);z-index:10;';
             cell.appendChild(badge);
           } else if (type === 'unpaid') {
-            // Dùng chung giao diện ĐỎ cho cả tự động lẫn thủ công
             cell.classList.add('leave-unpaid');
             cell.style.background = '#FEE2E2';
             cell.style.borderColor = '#EF4444';
@@ -176,8 +175,6 @@
     
     applyLeaveStyles();
     if (typeof window.toast === 'function') window.toast('Đã thêm ngày nghỉ thành công!', 'success');
-    
-    setTimeout(() => window.dispatchEvent(new Event('tour_leave_updated')), 100);
   }
 
   function removeLeave(date) {
@@ -188,8 +185,6 @@
     
     applyLeaveStyles();
     if (typeof window.toast === 'function') window.toast('Đã xóa ngày nghỉ!', 'info');
-    
-    setTimeout(() => window.dispatchEvent(new Event('tour_leave_updated')), 100);
   }
 
   window.addEventListener('load', () => {

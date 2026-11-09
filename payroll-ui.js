@@ -39,18 +39,16 @@
     const data = getAppData();
     const monthLogs = filterLogsByMonth(data.logs, m, y);
     
-    // ĐÃ XÓA CÂU LỆNH CHẶN: if (monthLogs.length === 0 ...) return "Không có dữ liệu";
-    // Bây giờ dù chưa có ngày công, nó vẫn sẽ chạy xuống dưới để tính toán các khoản (0đ).
-
     const p = PayrollEngine.calculate(m, y, monthLogs, data.settings.standardShiftHours);
     const companyName = getCompanyName();
     
+    // Hàm tạo dòng trong bảng (Đã bỏ viền dọc, thêm padding và màu sắc mềm mại)
     const hRow = (label, baseAmount, qty, actualAmount, bold = false) => `
-      <tr style="${bold ? 'background:#f8f9fa;font-weight:bold;' : ''}">
-        <td style="padding:6px 8px;border:1px solid #ddd;text-align:left;">${label}</td>
-        <td style="padding:6px 8px;border:1px solid #ddd;text-align:right;color:#64748b;">${baseAmount}</td>
-        <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;">${qty}</td>
-        <td style="padding:6px 8px;border:1px solid #ddd;text-align:right;">${formatMoney(actualAmount)}</td>
+      <tr style="${bold ? 'background:#f8fafc;font-weight:800;border-top:1.5px solid #e2e8f0;' : 'border-bottom:1px solid #f1f5f9;'}">
+        <td style="padding:10px 12px;text-align:left;color:#334155;">${label}</td>
+        <td style="padding:10px 12px;text-align:right;color:#64748b;">${baseAmount}</td>
+        <td style="padding:10px 12px;text-align:center;color:#475569;">${qty}</td>
+        <td style="padding:10px 12px;text-align:right;color:${bold ? '#0f172a' : '#1e293b'};font-weight:${bold ? '800' : '600'};">${formatMoney(actualAmount)}</td>
       </tr>`;
 
     const fixedRowsHTML = p.fixedRows.map(r => {
@@ -65,46 +63,93 @@
     if (p.ot.sundayNightH > 0) otRows += hRow('Tăng ca Chủ nhật (Đêm)', `${p.ot.sundayNightCoeff}x`, p.ot.sundayNightH + 'h', p.ot.sundayNightPay);
     if (p.nightHours > 0) otRows += hRow('Phụ cấp ca đêm', `30%`, p.nightHours + 'h', p.nightShiftPay);
 
+    // CSS chung cho khung bảng
+    const tableWrapperStyle = 'border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;margin-bottom:20px;background:#fff;';
+    const tableStyle = 'width:100%;border-collapse:collapse;font-size:12px;';
+    const thStyle = 'background:#0f172a;color:#fff;padding:12px 12px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;';
+
     return `
       <div style="background:#fff;color:#000;padding:16px;font-family:'Segoe UI',Arial,sans-serif;max-width:100%;box-sizing:border-box;border-radius:12px;">
+        
+        <!-- Header -->
         <div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-bottom:8px;">
-          <div style="font-size:18px;font-weight:800;text-transform:uppercase;text-align:center;">${companyName}</div>
+          <div style="font-size:18px;font-weight:800;text-transform:uppercase;text-align:center;letter-spacing:-0.5px;">${companyName}</div>
           <button onclick="window.PayrollUI.editCompany()" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#64748b;" title="Đổi tên công ty"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
         </div>
-        <div style="text-align:center;font-size:15px;font-weight:700;margin-bottom:16px;">PHIẾU LƯƠNG THÁNG ${String(m).padStart(2,'0')}/${y}</div>
+        <div style="text-align:center;font-size:15px;font-weight:700;margin-bottom:20px;color:#1e293b;">PHIẾU LƯƠNG THÁNG ${String(m).padStart(2,'0')}/${y}</div>
         
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:12px;flex-wrap:wrap;gap:4px;">
-          <div>Họ tên: <b>${data.settings.profileName || 'Nhân viên'}</b></div>
-          <div style="text-align:right;">
-            Ngày công: <b>${p.actualDays} / ${p.stdDaysDisplay}</b> 
+        <!-- Thông tin nhân viên -->
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:16px;flex-wrap:wrap;gap:4px;background:#f8fafc;padding:12px 16px;border-radius:10px;">
+          <div style="color:#475569;">Họ tên: <b style="color:#0f172a;">${data.settings.profileName || 'Nhân viên'}</b></div>
+          <div style="text-align:right;color:#475569;">
+            Ngày công: <b style="color:#0f172a;">${p.actualDays} / ${p.stdDaysDisplay}</b> 
             ${p.paidLeaveDays > 0 ? `<span style="color:#3b82f6;margin-left:4px">(+${p.paidLeaveDays}P)</span>` : ''} 
             ${p.unpaidLeaveDays > 0 ? `<span style="color:#f97316;margin-left:4px">(-${p.unpaidLeaveDays}R)</span>` : ''}
           </div>
         </div>
         
-        <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px;">
-          <thead><tr style="background:#0f172a;color:#fff;"><th style="padding:6px;border:1px solid #ddd;text-align:left;">Mục lục</th><th style="padding:6px;border:1px solid #ddd;text-align:right;">Định mức</th><th style="padding:6px;border:1px solid #ddd;text-align:center;">Thực tế</th><th style="padding:6px;border:1px solid #ddd;text-align:right;">Thành tiền</th></tr></thead>
-          <tbody>
-            ${fixedRowsHTML}
-            ${hRow('Thưởng chuyên cần', '300.000 đ', p.attendanceBonus > 0 ? '100%' : '0%', p.attendanceBonus)}
-            ${hRow('Thưởng khảo hạch', '500.000 đ', '-', p.appraisalBonus)}
-            <tr style="background:#f8f9fa;font-weight:bold;"><td colspan="3" style="padding:6px 8px;border:1px solid #ddd;text-align:left;">TỔNG LƯƠNG</td><td style="padding:6px 8px;border:1px solid #ddd;text-align:right;">${formatMoney(p.totalFixed + p.attendanceBonus + p.appraisalBonus)}</td></tr>
-          </tbody>
-        </table>
-        ${otRows ? `<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px;"><thead><tr style="background:#0f172a;color:#fff;"><th style="padding:6px;border:1px solid #ddd;text-align:left;">Khoản khác</th><th style="padding:6px;border:1px solid #ddd;text-align:right;">Định mức</th><th style="padding:6px;border:1px solid #ddd;text-align:center;">Số giờ</th><th style="padding:6px;border:1px solid #ddd;text-align:right;">Thành tiền</th></tr></thead><tbody>${otRows}</tbody></table>` : ''}
-        <div style="background:#f8f9fa;padding:12px;border-radius:8px;font-size:12px;">
-          <div style="display:flex;justify-content:space-between;font-weight:800;font-size:14px;margin-bottom:8px;"><span>TỔNG THU NHẬP</span><span>${formatMoney(p.grossIncome)}</span></div>
-          <div style="display:flex;justify-content:space-between;color:#dc2626;margin-bottom:4px;"><span>Truy thuế TN (10.5%)</span><span>-${formatMoney(p.insurance)}</span></div>
-          <div style="display:flex;justify-content:space-between;color:#dc2626;margin-bottom:4px;"><span>Công đoàn</span><span>-${formatMoney(p.unionFee)}</span></div>
-          <div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;color:#16a34a;margin-top:8px;padding-top:8px;border-top:1px solid #ddd;">
+        <!-- Bảng Lương -->
+        <div style="${tableWrapperStyle}">
+          <table style="${tableStyle}">
+            <thead>
+              <tr>
+                <th style="${thStyle} text-align:left;">Mục lục</th>
+                <th style="${thStyle} text-align:right;">Định mức</th>
+                <th style="${thStyle} text-align:center;">Thực tế</th>
+                <th style="${thStyle} text-align:right;">Thành tiền</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${fixedRowsHTML}
+              ${hRow('Thưởng chuyên cần', '300.000 đ', p.attendanceBonus > 0 ? '100%' : '0%', p.attendanceBonus)}
+              ${hRow('Thưởng khảo hạch', '500.000 đ', '-', p.appraisalBonus)}
+              <tr style="background:#f8fafc;font-weight:800;border-top:1.5px solid #e2e8f0;">
+                <td colspan="3" style="padding:12px;text-align:left;color:#0f172a;">TỔNG LƯƠNG</td>
+                <td style="padding:12px;text-align:right;color:#005BAA;font-size:13px;">${formatMoney(p.totalFixed + p.attendanceBonus + p.appraisalBonus)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Bảng Tăng ca & Phụ cấp -->
+        ${otRows ? `
+        <div style="${tableWrapperStyle}">
+          <table style="${tableStyle}">
+            <thead>
+              <tr>
+                <th style="${thStyle} text-align:left;">Khoản khác</th>
+                <th style="${thStyle} text-align:right;">Định mức</th>
+                <th style="${thStyle} text-align:center;">Số giờ</th>
+                <th style="${thStyle} text-align:right;">Thành tiền</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${otRows}
+            </tbody>
+          </table>
+        </div>` : ''}
+
+        <!-- Tổng kết -->
+        <div style="background:#f8fafc;padding:16px;border-radius:14px;border:1px solid #e2e8f0;">
+          <div style="display:flex;justify-content:space-between;font-weight:800;font-size:14px;margin-bottom:10px;color:#0f172a;">
+            <span>TỔNG THU NHẬP</span><span>${formatMoney(p.grossIncome)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;color:#dc2626;margin-bottom:6px;font-size:12px;font-weight:600;">
+            <span>Truy thuế TN (10.5%)</span><span>-${formatMoney(p.insurance)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;color:#dc2626;margin-bottom:6px;font-size:12px;font-weight:600;">
+            <span>Công đoàn</span><span>-${formatMoney(p.unionFee)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-weight:800;font-size:16px;color:#16a34a;margin-top:12px;padding-top:12px;border-top:1.5px dashed #cbd5e1;">
             <span>THỰC LĨNH</span>
             <span style="color: ${p.netIncome < 0 ? '#dc2626' : '#16a34a'}">${formatMoney(p.netIncome)}</span>
           </div>
-          ${p.netIncome < 0 ? `<div style="text-align:center;font-size:10px;color:#dc2626;margin-top:4px;">(Bạn chưa làm đủ ngày để bù trừ các khoản phí)</div>` : ''}
+          ${p.netIncome < 0 ? `<div style="text-align:center;font-size:11px;color:#dc2626;margin-top:6px;font-weight:600;">(Bạn chưa làm đủ ngày để bù trừ các khoản phí)</div>` : ''}
         </div>
-        <div style="margin-top:16px;text-align:center;">
-          <button onclick="window.PayrollUI.exportPNG(this)" style="padding:10px 20px;background:#0f172a;color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer;margin-right:8px;">📥 Tải ảnh</button>
-          <button onclick="window.print()" style="padding:10px 20px;background:#e2e8f0;color:#000;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">🖨️ In</button>
+        
+        <div style="margin-top:20px;text-align:center;">
+          <button onclick="window.PayrollUI.exportPNG(this)" style="padding:12px 24px;background:#0f172a;color:#fff;border:none;border-radius:10px;font-weight:bold;cursor:pointer;margin-right:8px;font-size:13px;">📥 Tải ảnh</button>
+          <button onclick="window.print()" style="padding:12px 24px;background:#e2e8f0;color:#000;border:none;border-radius:10px;font-weight:bold;cursor:pointer;font-size:13px;">🖨️ In</button>
         </div>
       </div>`;
   }
