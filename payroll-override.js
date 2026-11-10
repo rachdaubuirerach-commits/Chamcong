@@ -22,29 +22,8 @@
   }
 
   // ==========================================
-  // TỰ ĐỘNG SỬA LỖI DỮ LIỆU CŨ (Chạy ngay khi tải file)
+  // 1. GHI ĐÈ HÀM TÍNH LƯƠNG
   // ==========================================
-  setTimeout(() => {
-    const logKey = getProfileKey('worklogs');
-    let logs = [];
-    try { logs = JSON.parse(localStorage.getItem(logKey) || '[]'); } catch(e) {}
-    
-    let hasChanged = false;
-    logs.forEach(l => {
-      const d = new Date(l.date + 'T00:00:00');
-      const actualIsSunday = d.getDay() === 0;
-      if (l.isSunday !== actualIsSunday) {
-        l.isSunday = actualIsSunday;
-        hasChanged = true;
-      }
-    });
-    
-    if (hasChanged) {
-      localStorage.setItem(logKey, JSON.stringify(logs));
-      console.log('Đã tự động sửa lại dữ liệu ngày Chủ nhật bị lỗi!');
-    }
-  }, 1000);
-
   window.calculateWorkLog = function(workDate, shift, isSunday, startTimeStr, endTimeStr) {
     try {
       const cfg = getCustomConfig();
@@ -118,6 +97,49 @@
     }
   };
 
+  // ==========================================
+  // 2. TỰ ĐỘNG CẬP NHẬT LẠI TOÀN BỘ TIỀN CŨ (Chạy ngay khi tải file)
+  // ==========================================
+  setTimeout(() => {
+    const logKey = getProfileKey('worklogs');
+    let logs = [];
+    try { logs = JSON.parse(localStorage.getItem(logKey) || '[]'); } catch(e) {}
+    
+    let hasChanged = false;
+    logs.forEach(l => {
+      // Tính lại tiền dựa trên công thức mới nhất
+      const calc = window.calculateWorkLog(l.date, l.shift, l.isSunday, l.start, l.end);
+      
+      if (l.totalPay !== calc.totalPay || l.regularHours !== calc.regularHours || l.overtimeHours !== calc.overtimeHours) {
+        l.totalPay = calc.totalPay;
+        l.regularHours = calc.regularHours;
+        l.overtimeHours = calc.overtimeHours;
+        l.isPaidHoliday = calc.isPaidHoliday;
+        hasChanged = true;
+      }
+      
+      const d = new Date(l.date + 'T00:00:00');
+      const actualIsSunday = d.getDay() === 0;
+      if (l.isSunday !== actualIsSunday) {
+        l.isSunday = actualIsSunday;
+        hasChanged = true;
+      }
+    });
+    
+    if (hasChanged) {
+      localStorage.setItem(logKey, JSON.stringify(logs));
+      console.log('Đã đồng bộ lại toàn bộ số tiền cũ!');
+      
+      // Nếu đang ở trang home hoặc worklog, reload để hiển thị số mới ngay
+      if (document.body.dataset.page === 'home' || document.body.dataset.page === 'worklog') {
+        location.reload();
+      }
+    }
+  }, 500); // Đợi 500ms cho app.js load xong
+
+  // ==========================================
+  // 3. GHI ĐÈ HÀM CHẤM CÔNG NHANH
+  // ==========================================
   window.quickCheckIn = function() {
     try {
       const now = new Date();
@@ -177,6 +199,9 @@
     } catch (e) {}
   };
 
+  // ==========================================
+  // 4. LỚP BẢO VỆ REALTIME (LỌC NGÀY NGHỈ)
+  // ==========================================
   const originalGetLogsByMonth = window.getLogsByMonth;
   window.getLogsByMonth = function(m, y) {
     if (typeof originalGetLogsByMonth !== 'function') return [];
