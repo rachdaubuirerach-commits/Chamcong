@@ -22,7 +22,7 @@
   }
 
   // ==========================================
-  // 1. GHI ĐÈ HÀM TÍNH LƯƠNG
+  // 1. GHI ĐÈ HÀM TÍNH LƯƠNG (SỬA LỖI REGULAR HOURS)
   // ==========================================
   window.calculateWorkLog = function(workDate, shift, isSunday, startTimeStr, endTimeStr) {
     try {
@@ -63,15 +63,20 @@
         if (endHours >= bonusThreshold) overtimeHours += 0.5;
         if (shift === 'Đêm' && overtimeHours > 0) overtimeHours += 0.25;
       } else {
+        // ✅ LOGIC MỚI: regular hours = phần giao nhau giữa giờ làm thực và khung 8h chuẩn
+        const standardEnd = standardStart + 8; // 15.5 (Sáng) hoặc 27.5 (Đêm)
+        const regStart = Math.max(startHours, standardStart);
+        const regEnd = Math.min(endHours, standardEnd);
+        regularHours = Math.max(0, regEnd - regStart);
+        
+        // OT: phần vượt mốc tcStartHours
         let ot = 0;
         if (endHours > tcStartHours) {
-          ot = endHours - tcStartHours;
+          ot = endHours - Math.max(tcStartHours, startHours);
           if (ot >= 3) ot += 0.5;
           if (shift === 'Đêm') ot += 0.25;
         }
         overtimeHours = ot;
-        const late = Math.max(0, startHours - standardStart);
-        regularHours = Math.max(0, 8 - late);
       }
       
       regularHours = Math.round(regularHours * 100) / 100;
@@ -93,49 +98,49 @@
         isPaidHoliday: !!paidHoliday, holiday: paidHoliday
       };
     } catch (e) {
-      return { regularHours: 8, overtimeHours: 0, totalPay: 0, isPaidHoliday: false };
+      return { regularHours: 0, overtimeHours: 0, totalPay: 0, isPaidHoliday: false };
     }
   };
 
   // ==========================================
-  // 2. TỰ ĐỘNG CẬP NHẬT LẠI TOÀN BỘ TIỀN CŨ (Chạy ngay khi tải file)
+  // 2. TỰ ĐỘNG RECALC LẠI TOÀN BỘ LOGS (Chỉ 1 lần, dùng flag)
   // ==========================================
+  const RECALC_FLAG = 'tt_recalc_regular_hours_v1';
   setTimeout(() => {
+    if (localStorage.getItem(RECALC_FLAG) === '1') return;
+    
     const logKey = getProfileKey('worklogs');
     let logs = [];
     try { logs = JSON.parse(localStorage.getItem(logKey) || '[]'); } catch(e) {}
     
     let hasChanged = false;
     logs.forEach(l => {
-      // Tính lại tiền dựa trên công thức mới nhất
-      const calc = window.calculateWorkLog(l.date, l.shift, l.isSunday, l.start, l.end);
-      
-      if (l.totalPay !== calc.totalPay || l.regularHours !== calc.regularHours || l.overtimeHours !== calc.overtimeHours) {
-        l.totalPay = calc.totalPay;
-        l.regularHours = calc.regularHours;
-        l.overtimeHours = calc.overtimeHours;
-        l.isPaidHoliday = calc.isPaidHoliday;
-        hasChanged = true;
-      }
-      
       const d = new Date(l.date + 'T00:00:00');
       const actualIsSunday = d.getDay() === 0;
       if (l.isSunday !== actualIsSunday) {
         l.isSunday = actualIsSunday;
         hasChanged = true;
       }
+      
+      const c = window.calculateWorkLog(l.date, l.shift, l.isSunday, l.start, l.end);
+      if (l.totalPay !== c.totalPay || l.regularHours !== c.regularHours || l.overtimeHours !== c.overtimeHours) {
+        l.totalPay = c.totalPay;
+        l.regularHours = c.regularHours;
+        l.overtimeHours = c.overtimeHours;
+        l.isPaidHoliday = c.isPaidHoliday;
+        hasChanged = true;
+      }
     });
     
     if (hasChanged) {
       localStorage.setItem(logKey, JSON.stringify(logs));
-      console.log('Đã đồng bộ lại toàn bộ số tiền cũ!');
-      
-      // Nếu đang ở trang home hoặc worklog, reload để hiển thị số mới ngay
-      if (document.body.dataset.page === 'home' || document.body.dataset.page === 'worklog') {
-        location.reload();
+      console.log('[payroll-override] Đã recalc toàn bộ logs với logic mới.');
+      if (['home', 'worklog', 'stats'].includes(document.body.dataset.page)) {
+        setTimeout(() => location.reload(), 500);
       }
     }
-  }, 500); // Đợi 500ms cho app.js load xong
+    localStorage.setItem(RECALC_FLAG, '1');
+  }, 1000);
 
   // ==========================================
   // 3. GHI ĐÈ HÀM CHẤM CÔNG NHANH
