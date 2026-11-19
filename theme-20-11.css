@@ -1,0 +1,193 @@
+/* ═══════════════════════════════════════════════════════════════
+   theme-20-11.css — Retro Ngày Nhà giáo Việt Nam (Bản gọn)
+   ═══════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Caveat:wght@600;700&family=Patrick+Hand&display=swap');
+
+/* ───────────── LIGHT MODE ───────────── */
+:root, [data-theme="light"] {
+  --primary: #2A5744;
+  --primary-dark: #1A3A2A;
+  --primary-light: #E8F0EA;
+  --primary-glow: rgba(42, 87, 68, 0.3);
+  --accent: #C73E1D;
+  --accent-light: #FFE8E0;
+  --bg: #F5E9D0;
+  --surface: #FFFDF5;
+  --surface-2: #FAF3E3;
+  --surface-3: #F0E6D2;
+  --text-1: #2A1F15;
+  --text-2: #6B4F35;
+  --text-3: #A08568;
+  --border: #E0D2B5;
+}
+
+[data-theme="dark"] {
+  --primary: #7AB88F;
+  --primary-dark: #5A9870;
+  --primary-light: #1A2E22;
+  --primary-glow: rgba(122, 184, 143, 0.3);
+  --accent: #E85A3D;
+  --accent-light: #3A1810;
+  --bg: #1A1410;
+  --surface: #241C14;
+  --surface-2: #2E241A;
+  --surface-3: #3A2E22;
+  --text-1: #F0E6D2;
+  --text-2: #B8A88A;
+  --text-3: #7A6A50;
+  --border: #3A2E22;
+}
+
+/* ═══════════════ HEADER — Bảng xanh ═══════════════ */
+.hero-header,
+.page-header {
+  background: #2A4A3A !important;
+  background-image:
+    radial-gradient(ellipse at 20% 20%, rgba(255,255,255,0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(255,255,255,0.04) 0%, transparent 50%) !important;
+  border-bottom: 4px solid #8B5A2B !important;
+  box-shadow: 0 6px 20px rgba(42, 74, 58, 0.35) !important;
+}
+
+.hero-header::before,
+.hero-header::after { background: rgba(255,255,255,0.05) !important; }
+
+.hero-header .brand-name,
+.hero-header .greeting-name,
+.page-header .page-title {
+  font-family: 'Playfair Display', serif !important;
+}
+
+/* ═══════════════ BALANCE CARD — Sổ tay ═══════════════ */
+.balance-card {
+  background: #FFFDF5 !important;
+  border: 1.5px solid #E0D2B5 !important;
+  box-shadow:
+    0 4px 16px rgba(42, 31, 21, 0.08),
+    inset 0 0 0 3px rgba(200, 170, 120, 0.06) !important;
+}
+.balance-amount, #home-salary {
+  font-family: 'Caveat', cursive !important;
+  font-weight: 700 !important;
+  color: #2A5744 !important;
+}
+[data-theme="dark"] .balance-amount,
+[data-theme="dark"] #home-salary { color: #7AB88F !important; }
+.balance-label { font-family: 'Patrick Hand', cursive !important; color: #6B4F35 !important; }
+.balance-sub { font-family: 'Patrick Hand', cursive !important; }
+
+/* ═══════════════ CARDS — Giấy vở ô ly ═══════════════ */
+.card {
+  background: #FFFDF5 !important;
+  background-image: repeating-linear-gradient(
+    0deg, transparent 0, transparent 31px,
+    rgba(140, 170, 200, 0.10) 31px, rgba(140, 170, 200, 0.10) 32px
+  ) !important;
+  border: 1px solid #E0D2B5 !important;
+}
+[data-theme="dark"] .card {
+  background: #241C14 !important;
+  background-image: repeating-linear-gradient(
+    0deg, transparent 0, transparent 31px,
+    rgba(255, 240, 210, 0.03) 31px, rgba(255, 240, 210, 0.03) 32px
+  ) !important;
+  border-color: #3A2E22 !important;
+}
+.card-header { font-family: 'Playfair Display', serif !important; color: #2A5744 !important; }
+[data-theme="dark"] .card-header { color: #7AB88F !important; }
+.card-header .icon { background: #E8F0EA !important; color: #2A5744 !important; }
+[data-theme="dark"] .card-header .icon { background: #1A2E22 !important; color: #7AB88F !important; }
+
+/* ═══════════════ STAT CARDS ═══════════════ */
+.stat-card { background: #FFFDF5 !important; border: 1px solid #E0D2B5 !important; }
+.stat-card.highlight {
+  background: linear-gradient(135deg, #2A5744, #1A3A2A) !important;
+  box-shadow: 0 6px 18px rgba(42, 87, 68, 0.3) !important;
+}
+.stat-val { font-family: 'Caveat', cursive !important; }
+
+/* ═══════════════ BUTTONS ═══════════════ */
+.btn-primary,
+.balance-action-btn.primary,
+.cal-tab.active {
+  background: linear-gradient(135deg, #2A5744, #1A3A2A) !important;
+  box-shadow: 0 4px 12px rgba(42, 87, 68, 0.3) !important;
+  color: #FFC933 !important;
+}
+.btn-secondary,
+.balance-action-btn.secondary {
+  background: #FAF3E3 !important;
+  color: #6B4F35 !important;
+  border: 1px solid #E0D2B5 !important;
+}
+[data-theme="dark"] .btn-secondary,
+[data-theme="dark"] .balance-action-btn.secondary {
+  background: #2E241A !important;
+  color: #B8A88A !important;
+}
+
+/* ═══════════════ QUICK ACTIONS ═══════════════ */
+.quick-action { background: #FFFDF5 !important; border: 1px solid #E0D2B5 !important; }
+.quick-action span { color: #6B4F35 !important; font-family: 'Patrick Hand', cursive !important; }
+[data-theme="dark"] .quick-action { background: #241C14 !important; border-color: #3A2E22 !important; }
+[data-theme="dark"] .quick-action span { color: #B8A88A !important; }
+
+.qa-blue   { background: linear-gradient(135deg, #2A5744, #1A3A2A) !important; }
+.qa-gold   { background: linear-gradient(135deg, #C73E1D, #A02E15) !important; }
+.qa-green  { background: linear-gradient(135deg, #4A8B5A, #2A5744) !important; }
+.qa-purple { background: linear-gradient(135deg, #8B5A2B, #6B4A1F) !important; }
+
+/* ═══════════════ BOTTOM NAV ═══════════════ */
+.bottom-nav {
+  background: #2A4A3A !important;
+  border: 2px solid #1A3A2A !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35) !important;
+}
+.nav-item { color: rgba(255, 253, 245, 0.55) !important; }
+.nav-item.active {
+  background: rgba(255, 253, 245, 0.15) !important;
+  color: #FFC933 !important;
+}
+
+/* ═══════════════ FORM ═══════════════ */
+.form-control {
+  background: #FAF3E3 !important;
+  border-color: #E0D2B5 !important;
+  color: #2A1F15 !important;
+}
+.form-control:focus { background: #FFFDF5 !important; border-color: #2A5744 !important; }
+[data-theme="dark"] .form-control { background: #2E241A !important; border-color: #3A2E22 !important; color: #F0E6D2 !important; }
+.form-group label { font-family: 'Patrick Hand', cursive !important; color: #6B4F35 !important; }
+[data-theme="dark"] .form-group label { color: #B8A88A !important; }
+
+/* ═══════════════ DRAWER ═══════════════ */
+.drawer-panel { background: #FAF3E3 !important; }
+[data-theme="dark"] .drawer-panel { background: #241C14 !important; }
+.drawer-user-info .avatar,
+.profile-item .avatar,
+#edit-name-avatar,
+.pin-icon {
+  background: linear-gradient(135deg, #2A5744, #1A3A2A) !important;
+  color: #FFC933 !important;
+}
+
+/* ═══════════════ CALENDAR ═══════════════ */
+.cal-day.sunday       { background: #FFF3CC !important; color: #6B4A1F !important; border-color: #D4A017 !important; }
+.cal-day.has-holiday  { background: #FFE8E0 !important; color: #7F1D1D !important; border-color: #C73E1D !important; }
+.cal-day.done-normal  { background: #E0F0E5 !important; color: #14532D !important; border-color: #4A8B5A !important; }
+.cal-day.done-sunday  { background: #FCE7F3 !important; color: #831843 !important; border-color: #DB2777 !important; }
+.cal-day.done-holiday { background: #DBEAFE !important; color: #1E3A8A !important; border-color: #2563EB !important; }
+.cal-day.today { box-shadow: 0 0 0 2.5px #FFC933 !important; }
+
+/* ═══════════════ CHART / PROGRESS ═══════════════ */
+.progress-fill { background: linear-gradient(90deg, #2A5744, #4A8B5A) !important; }
+.chart-bar { background: linear-gradient(180deg, #4A8B5A, #2A5744) !important; }
+
+/* ═══════════════ TOAST ═══════════════ */
+.toast { background: #FFFDF5 !important; border: 1px solid #E0D2B5 !important; }
+
+/* ═══════════════ SPLASH ═══════════════ */
+#splash-screen {
+  background: linear-gradient(135deg, #A02E15 0%, #C73E1D 50%, #2A4A3A 100%) !important;
+}
