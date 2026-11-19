@@ -2,7 +2,21 @@
 
 const PayrollEngine = (function () {
 
-  function getStandardWorkDays(month, year) {
+  // ✅ Đọc settings user (Lương CB, Ngày công, Giờ chuẩn, Break)
+  function readSettings() {
+    const p = localStorage.getItem('tt_active_profile') || 'default';
+    const key = p === 'default' ? 'timesheet_settings' : `timesheet_${p}_settings`;
+    let s = {};
+    try { s = JSON.parse(localStorage.getItem(key) || '{}'); } catch(e) {}
+    return {
+      baseSalary: Number(s.baseSalary) || 5939400,
+      standardWorkDays: Math.max(1, Number(s.standardWorkDays) || 26),
+      standardShiftHours: Math.max(0.5, Number(s.standardShiftHours) || 8)
+    };
+  }
+
+  // Đếm số ngày thường của tháng (để hiển thị "26/27")
+  function getMonthWorkDays(month, year) {
     const daysInMonth = new Date(year, month, 0).getDate();
     let stdDays = 0;
     for (let d = 1; d <= daysInMonth; d++) {
@@ -21,12 +35,19 @@ const PayrollEngine = (function () {
 
   function calculate(month, year, logs, standardShiftHours) {
     const cfg = PAYROLL_CONFIG;
-    const stdDaysDisplay = getStandardWorkDays(month, year);
+    const st = readSettings();
+    
+    // ✅ User-defined
+    const userStdDays = st.standardWorkDays;
+    const userStdHours = st.standardShiftHours;
+    const userBaseSalary = st.baseSalary;
+    
+    // Ngày công thực tế của tháng (để hiển thị, không dùng làm mẫu số chia lương)
+    const stdDaysDisplay = getMonthWorkDays(month, year);
     const leaves = getLeaveTypes();
     
     const now = new Date();
     const isCurrentMonth = (month === now.getMonth() + 1 && year === now.getFullYear());
-    // SỬA LỖI TẠI ĐÂY: Lấy ngày thực tế của hôm nay, không ghép với tháng đang xem
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const daysInMonth = new Date(year, month, 0).getDate();
     
@@ -71,7 +92,6 @@ const PayrollEngine = (function () {
 
     const validLogs = logs.filter(l => !leaves[l.date]);
     
-    // Đếm ngày công thực tế (tự tính isSunday từ ngày, bỏ qua trường isSunday bị lỗi trong data cũ)
     let actualDays = 0;
     let actualDaysInPast = 0;
     validLogs.forEach(l => {
@@ -90,24 +110,44 @@ const PayrollEngine = (function () {
 
     const unpaidLeaveDays = manualUnpaidLeaveDays + autoMissedDays;
     const totalPaidDays = actualDays + paidLeaveDays;
-    const calcRatio = totalPaidDays / 26; 
+    
+    // ✅ Tỷ lệ pro-rate dùng mốc user-defined (vd 20)
+    const calcRatio = totalPaidDays / userStdDays;
 
-    const normalNightShifts = validLogs.filter(l => {
-      const d = new Date(l.date + 'T00:00:00');
-      const dow = d.getDay();
-      return l.shift === 'Đêm' && dow !== 0 && !l.isPaidHoliday && (l.regularHours > 0 || l.overtimeHours > 0);
-    }).length;
-    const totalNightHours = normalNightShifts * 7; 
-
-    const baseSalaryCfg = Number(cfg.fixedEarnings.find(e => e.id === 'base')?.amount) || 5939400;
-    const hourlyRate = baseSalaryCfg / 26 / (Number(standardShiftHours) || 8);
-
-    let totalFixed = 0;
-    const fixedRows = cfg.fixedEarnings.map(e => {
-      const amt = e.proRate ? Math.round(e.amount * calcRatio) : e.amount;
-      totalFixed += amt;
-      return { name: e.name, qty: `${actualDays}/${stdDaysDisplay}`, amount: amt };
+    // Phụ cấp đêm: theo giờ làm thực tế (dynamic break)
+    const breakHours = Number(JSON.parse(localStorage.getItem(
+      (localStorage.getItem('tt_active_profile') || 'default') === 'default'
+        ? 'timesheet_settings'
+        : `timesheet_${localStorage.getItem('tt_active_profile')}_settings`
+    ) || '{}').breakHours) || 0;
+    
+    let totalNightHours = 0;
+    validLogs.forEach(l => {
+      if (l.shift === 'Đêm') {
+        const d = new Date(l.date + 'T00:00:00');
+        if (d.getDay() !== 0 && !l.isPaidHoliday) {
+          const h = (l.regularHours || 0) + (l.overtimeHours || 0);
+          if (h >= userStdHours + breakHours) totalNightHours += userStdHours - breakHours;
+          else if (h >= userStdHours) totalNightHours += h - breakHours / 2;
+          else totalNightHours += h;
+        }
+      }
     });
+
+    // ✅ Lương giờ = Lương CB / Số ngày công user / Giờ chuẩn user
+    const hourlyRate = userBaseSalary / userStdDays / userStdHours;
+
+    // Filter amount = 0 (bỏ qua phụ cấp không có)
+    let totalFixed = 0;
+    const fixedRows = cfg.fixedEarnings
+      .filter(e => e.amount > 0)
+      .map(e => {
+        // Nếu là base → dùng userBaseSalary
+        const baseAmount = e.id === 'base' ? userBaseSalary : e.amount;
+        const amt = e.proRate ? Math.round(baseAmount * calcRatio) : baseAmount;
+        totalFixed += amt;
+        return { name: e.name, qty: `${actualDays}/${stdDaysDisplay}`, amount: amt };
+      });
 
     const isFullAttendance = (totalPaidDays >= stdDaysDisplay) && (unpaidLeaveDays === 0);
     const attendanceBonus = isFullAttendance ? 300000 : 0; 
@@ -120,7 +160,7 @@ const PayrollEngine = (function () {
       const otH = Number(l.overtimeHours) || 0;
       const isNight = l.shift === 'Đêm';
       const d = new Date(l.date + 'T00:00:00');
-      const isSunday = d.getDay() === 0; // Tự tính lại
+      const isSunday = d.getDay() === 0;
 
       if (otH > 0) {
         if (isSunday) {
@@ -171,5 +211,5 @@ const PayrollEngine = (function () {
     };
   }
 
-  return { calculate, getStandardWorkDays };
+  return { calculate, getStandardWorkDays: getMonthWorkDays };
 })();

@@ -21,19 +21,32 @@
     try { return JSON.parse(localStorage.getItem('tt_leave_types') || '{}'); } catch(e) { return {}; }
   }
 
+  // ✅ Đọc settings do user cấu hình (Lương CB, Ngày công, Giờ chuẩn, Break)
+  function getActiveSettings() {
+    let s = {};
+    try { s = JSON.parse(localStorage.getItem(getProfileKey('settings')) || '{}'); } catch(e) {}
+    return {
+      baseSalary: Number(s.baseSalary) || 5939400,
+      standardWorkDays: Math.max(1, Number(s.standardWorkDays) || 26),
+      standardShiftHours: Math.max(0.5, Number(s.standardShiftHours) || 8),
+      breakHours: Math.max(0, Number(s.breakHours) || 0)
+    };
+  }
+
   // ==========================================
-  // 1. GHI ĐÈ HÀM TÍNH LƯƠNG (SỬA LỖI REGULAR HOURS)
+  // 1. GHI ĐÈ HÀM TÍNH LƯƠNG (LINH HOẠT THEO SETTINGS)
   // ==========================================
   window.calculateWorkLog = function(workDate, shift, isSunday, startTimeStr, endTimeStr) {
     try {
       const cfg = getCustomConfig();
-      const d = new Date(workDate + 'T00:00:00');
-      let stdDays = 26;
-      if (typeof PayrollEngine !== 'undefined' && PayrollEngine.getStandardWorkDays) {
-          stdDays = PayrollEngine.getStandardWorkDays(d.getMonth() + 1, d.getFullYear());
-      }
+      const st = getActiveSettings();
       
-      const hourlyRate = cfg.baseSalary / stdDays / 8;
+      const stdDays = st.standardWorkDays;      // 👈 User nhập (vd: 20)
+      const stdHours = st.standardShiftHours;   // 👈 User nhập (vd: 6)
+      const brkHours = st.breakHours;           // 👈 User nhập (vd: 1)
+      
+      const hourlyRate = st.baseSalary / stdDays / stdHours;
+      
       const [sh, sm] = (startTimeStr || '07:30').split(':').map(Number);
       const [eh, em] = (endTimeStr || '19:30').split(':').map(Number);
       const startDate = new Date(2000, 0, 1, sh, sm, 0);
@@ -46,30 +59,33 @@
       const paidHoliday = typeof HolidayResolver !== 'undefined' ? HolidayResolver.getPaidHoliday(workDate) : null;
       const isSpecialDay = isSunday || !!paidHoliday;
       
-      let regularHours = 0, overtimeHours = 0;
+      // Điểm bắt đầu ca & điểm kết thúc ca chuẩn (động theo user)
       const standardStart = shift === 'Sáng' ? 7.5 : 19.5;
-      const tcStartHours = shift === 'Sáng' ? 16.5 : 28.5;
-      const bonusThreshold = shift === 'Sáng' ? 19.5 : 31.5;
+      const standardEnd = standardStart + stdHours;
+      const tcStartHours = standardEnd + brkHours;   // OT bắt đầu sau break
+      const bonusThreshold = tcStartHours + 3;       // Bonus +0.5h khi OT >= 3h
+      
+      let regularHours = 0, overtimeHours = 0;
       
       if (isSpecialDay) {
+        // CN/Lễ: toàn bộ giờ làm → OT
         let worked = totalHours;
-        if (totalHours >= 8) worked -= 0.5;
-        else if (totalHours >= 6) worked -= 0.25;
-        if (shift === 'Sáng' && endHours > 16.5) worked -= 0.5;
-        else if (shift === 'Đêm' && endHours > 28.5) worked -= 0.5;
+        if (totalHours >= stdHours + brkHours) worked -= brkHours;
+        else if (totalHours >= stdHours) worked -= brkHours / 2;
         if (worked < 0) worked = 0;
+        
         regularHours = 0;
         overtimeHours = worked;
         if (endHours >= bonusThreshold) overtimeHours += 0.5;
         if (shift === 'Đêm' && overtimeHours > 0) overtimeHours += 0.25;
       } else {
-        // ✅ LOGIC MỚI: regular hours = phần giao nhau giữa giờ làm thực và khung 8h chuẩn
-        const standardEnd = standardStart + 8; // 15.5 (Sáng) hoặc 27.5 (Đêm)
+        // Ngày thường
+        // Regular = phần giao giữa [startHours, endHours] và [standardStart, standardEnd]
         const regStart = Math.max(startHours, standardStart);
         const regEnd = Math.min(endHours, standardEnd);
         regularHours = Math.max(0, regEnd - regStart);
         
-        // OT: phần vượt mốc tcStartHours
+        // OT = phần vượt tcStartHours
         let ot = 0;
         if (endHours > tcStartHours) {
           ot = endHours - Math.max(tcStartHours, startHours);
@@ -81,6 +97,7 @@
       
       regularHours = Math.round(regularHours * 100) / 100;
       overtimeHours = Math.round(overtimeHours * 100) / 100;
+      
       const regularPay = regularHours * hourlyRate;
       let overtimePay = 0;
       
@@ -103,24 +120,19 @@
   };
 
   // ==========================================
-  // 2. TỰ ĐỘNG RECALC LẠI TOÀN BỘ LOGS (Chỉ 1 lần, dùng flag)
+  // 2. TỰ ĐỘNG RECALC LẠI TOÀN BỘ LOGS
   // ==========================================
-  const RECALC_FLAG = 'tt_recalc_regular_hours_v1';
-  setTimeout(() => {
-    if (localStorage.getItem(RECALC_FLAG) === '1') return;
-    
+  function recalcAllLogs(showToast) {
     const logKey = getProfileKey('worklogs');
     let logs = [];
     try { logs = JSON.parse(localStorage.getItem(logKey) || '[]'); } catch(e) {}
+    if (logs.length === 0) return;
     
-    let hasChanged = false;
+    let changed = false;
     logs.forEach(l => {
       const d = new Date(l.date + 'T00:00:00');
       const actualIsSunday = d.getDay() === 0;
-      if (l.isSunday !== actualIsSunday) {
-        l.isSunday = actualIsSunday;
-        hasChanged = true;
-      }
+      if (l.isSunday !== actualIsSunday) { l.isSunday = actualIsSunday; changed = true; }
       
       const c = window.calculateWorkLog(l.date, l.shift, l.isSunday, l.start, l.end);
       if (l.totalPay !== c.totalPay || l.regularHours !== c.regularHours || l.overtimeHours !== c.overtimeHours) {
@@ -128,19 +140,26 @@
         l.regularHours = c.regularHours;
         l.overtimeHours = c.overtimeHours;
         l.isPaidHoliday = c.isPaidHoliday;
-        hasChanged = true;
+        changed = true;
       }
     });
     
-    if (hasChanged) {
+    if (changed) {
       localStorage.setItem(logKey, JSON.stringify(logs));
-      console.log('[payroll-override] Đã recalc toàn bộ logs với logic mới.');
-      if (['home', 'worklog', 'stats'].includes(document.body.dataset.page)) {
-        setTimeout(() => location.reload(), 500);
+      if (typeof window.refreshCurrentPage === 'function') window.refreshCurrentPage();
+      if (showToast && typeof window.toast === 'function') {
+        window.toast('✅ Đã áp dụng lương mới cho toàn bộ dữ liệu!', 'success');
       }
     }
-    localStorage.setItem(RECALC_FLAG, '1');
-  }, 1000);
+  }
+  
+  // Boot: recalc 1 lần để đồng bộ
+  setTimeout(() => {
+    try { recalcAllLogs(false); } catch(e) {}
+  }, 1500);
+  
+  // Expose để file khác gọi
+  window.PayrollOverride = { recalcAll: recalcAllLogs };
 
   // ==========================================
   // 3. GHI ĐÈ HÀM CHẤM CÔNG NHANH
@@ -157,11 +176,11 @@
       try { logs = JSON.parse(localStorage.getItem(logKey) || '[]'); } catch(e) {}
       
       let ts = getTodayStr();
-      let shift = 'Sáng'; 
+      let shift = 'Sáng';
       
       if (logs.length > 0) {
         logs.sort((a, b) => new Date(b.date) - new Date(a.date));
-        shift = logs[0].shift; 
+        shift = logs[0].shift;
       }
 
       if (shift === 'Đêm' && hour < 10) {
@@ -205,7 +224,7 @@
   };
 
   // ==========================================
-  // 4. LỚP BẢO VỆ REALTIME (LỌC NGÀY NGHỈ)
+  // 4. LỚP BẢO VỆ REALTIME
   // ==========================================
   const originalGetLogsByMonth = window.getLogsByMonth;
   window.getLogsByMonth = function(m, y) {
